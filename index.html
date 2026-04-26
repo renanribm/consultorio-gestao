@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão Financeira — Consultório</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ══ LOGIN ══════════════════════════════════════════════════════════════ -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-bg"></div>
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-logo-mark">✦</div>
+        <h1 class="login-title">Consultório</h1>
+        <p class="login-subtitle">Gestão Financeira</p>
+      </div>
+      <form id="login-form" autocomplete="on">
+        <div class="form-group">
+          <label for="login-email">E-mail</label>
+          <input type="email" id="login-email" name="email" autocomplete="email" required placeholder="seu@email.com.br">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Senha</label>
+          <input type="password" id="login-password" name="password" autocomplete="current-password" required placeholder="••••••••">
+        </div>
+        <div id="login-error" class="login-error hidden"></div>
+        <button type="submit" class="btn btn-primary btn-full" id="btn-login">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ APP SHELL ══════════════════════════════════════════════════════════ -->
+  <div id="app-shell" class="app-shell hidden">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <span class="sidebar-logo-mark">✦</span>
+          <div class="sidebar-brand-text">
+            <div class="sidebar-brand-name">Consultório</div>
+            <div class="sidebar-brand-sub">Gestão Financeira</div>
+          </div>
+        </div>
+        <button class="sidebar-collapse-btn" id="sidebar-toggle" title="Recolher menu">&#9776;</button>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <a class="nav-item active" data-view="dashboard" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zM3 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zm6 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+          <span class="nav-label">Dashboard</span>
+        </a>
+        <a class="nav-item" data-view="recebimentos" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"/></svg>
+          <span class="nav-label">Recebimentos</span>
+        </a>
+        <a class="nav-item" data-view="despesas" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v3.586L7.707 9.293a1 1 0 00-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 10.586V7z" clip-rule="evenodd"/></svg>
+          <span class="nav-label">Despesas</span>
+        </a>
+        <a class="nav-item" data-view="inadimplencia" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          <span class="nav-label">Inadimplência</span>
+          <span class="nav-badge hidden" id="badge-inadimplencia">0</span>
+        </a>
+        <a class="nav-item" data-view="secretaria" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
+          <span class="nav-label">Painel Secretária</span>
+          <span class="nav-badge hidden" id="badge-nf">0</span>
+        </a>
+        <a class="nav-item nav-medica-only hidden" data-view="dre" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+          <span class="nav-label">DRE</span>
+        </a>
+        <a class="nav-item nav-medica-only hidden" data-view="import" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+          <span class="nav-label">Importar CSV</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="sidebar-user" id="sidebar-user">
+          <div class="sidebar-avatar" id="sidebar-avatar">M</div>
+          <div class="sidebar-user-info">
+            <div class="sidebar-user-name" id="sidebar-user-name">Carregando…</div>
+            <div class="sidebar-user-role" id="sidebar-user-role">—</div>
+          </div>
+        </div>
+        <button class="btn-logout" id="btn-logout" title="Sair">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="18" height="18"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clip-rule="evenodd"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main" id="main">
+
+      <!-- Filter Bar -->
+      <div class="filter-bar" id="filter-bar">
+        <div class="filter-presets" id="filter-presets">
+          <button class="filter-btn active" data-period="mes">Este mês</button>
+          <button class="filter-btn" data-period="mespassado">Mês passado</button>
+          <button class="filter-btn" data-period="3meses">3 meses</button>
+          <button class="filter-btn" data-period="6meses">6 meses</button>
+          <button class="filter-btn" data-period="ano">Este ano</button>
+          <button class="filter-btn" data-period="custom">Personalizado</button>
+        </div>
+        <div class="filter-custom hidden" id="filter-custom">
+          <input type="date" id="filter-start" aria-label="Data inicial">
+          <span class="filter-sep">até</span>
+          <input type="date" id="filter-end" aria-label="Data final">
+          <button class="btn btn-sm btn-primary" id="btn-apply-filter">Aplicar</button>
+        </div>
+        <div class="filter-label" id="filter-label"></div>
+      </div>
+
+      <!-- ── DASHBOARD ─────────────────────────────────────────────────── -->
+      <section class="view" id="view-dashboard">
+        <div class="view-header">
+          <h2 class="view-title">Dashboard</h2>
+          <span class="view-period" id="dash-period"></span>
+        </div>
+
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-green">
+            <div class="kpi-label">Receita Recebida</div>
+            <div class="kpi-value" id="kpi-receita">R$ 0,00</div>
+            <div class="kpi-meta" id="kpi-receita-meta">0 atendimentos</div>
+          </div>
+          <div class="kpi-card kpi-amber">
+            <div class="kpi-label">A Receber</div>
+            <div class="kpi-value" id="kpi-pendente">R$ 0,00</div>
+            <div class="kpi-meta" id="kpi-pendente-meta">0 pendentes</div>
+          </div>
+          <div class="kpi-card kpi-red">
+            <div class="kpi-label">Despesas</div>
+            <div class="kpi-value" id="kpi-despesas">R$ 0,00</div>
+            <div class="kpi-meta" id="kpi-despesas-meta">0 lançamentos</div>
+          </div>
+          <div class="kpi-card kpi-blue">
+            <div class="kpi-label">Resultado Líquido</div>
+            <div class="kpi-value" id="kpi-resultado">R$ 0,00</div>
+            <div class="kpi-meta" id="kpi-resultado-meta">Margem: 0%</div>
+          </div>
+          <div class="kpi-card kpi-sage">
+            <div class="kpi-label">Atend. Gratuitos</div>
+            <div class="kpi-value" id="kpi-gratuito">0</div>
+            <div class="kpi-meta">no período</div>
+          </div>
+          <div class="kpi-card kpi-purple">
+            <div class="kpi-label">Ticket Médio</div>
+            <div class="kpi-value" id="kpi-ticket">R$ 0,00</div>
+            <div class="kpi-meta">consultas pagas</div>
+          </div>
+        </div>
+
+        <div class="alert-nf hidden" id="alert-nf">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+          <span><strong id="alert-nf-count">0 notas fiscais</strong> pendentes de emissão. &nbsp;<a href="#" data-view="secretaria" class="alert-link">Ver no painel →</a></span>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="card chart-card">
+            <div class="card-header"><h3>Evolução Mensal (6 meses)</h3></div>
+            <div class="chart-wrap"><canvas id="chart-mensal"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Últimos Lançamentos</h3></div>
+            <div class="recent-list" id="recent-list">
+              <div class="empty-state">Nenhum lançamento.</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── RECEBIMENTOS ──────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-recebimentos">
+        <div class="view-header">
+          <h2 class="view-title">Recebimentos</h2>
+          <button class="btn btn-primary" id="btn-novo-rec">+ Novo Recebimento</button>
+        </div>
+        <div class="card table-card">
+          <div class="table-toolbar">
+            <input type="text" class="search-input" id="search-rec" placeholder="Buscar por paciente…">
+            <div class="table-summary" id="summary-rec"></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Paciente</th><th>Tipo</th>
+                  <th class="text-right">Valor</th><th>Status</th>
+                  <th>Nota Fiscal</th><th>Obs.</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-rec">
+                <tr><td colspan="8" class="empty-row">Nenhum registro no período.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── DESPESAS ──────────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-despesas">
+        <div class="view-header">
+          <h2 class="view-title">Despesas</h2>
+          <button class="btn btn-primary" id="btn-nova-desp">+ Nova Despesa</button>
+        </div>
+        <div class="card table-card">
+          <div class="table-toolbar">
+            <input type="text" class="search-input" id="search-desp" placeholder="Buscar por descrição…">
+            <div class="table-summary" id="summary-desp"></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Descrição</th><th>Categoria</th>
+                  <th>Recorrência</th><th class="text-right">Valor</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-desp">
+                <tr><td colspan="6" class="empty-row">Nenhuma despesa no período.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── INADIMPLÊNCIA ─────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-inadimplencia">
+        <div class="view-header">
+          <h2 class="view-title">Controle de Inadimplência</h2>
+        </div>
+        <div class="inadimplencia-summary hidden" id="inadimplencia-summary"></div>
+        <div class="card table-card">
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Paciente</th><th>Tipo</th>
+                  <th class="text-right">Valor</th><th>Dias em Aberto</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-inadimplencia">
+                <tr><td colspan="6" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PAINEL SECRETÁRIA ─────────────────────────────────────────── -->
+      <section class="view hidden" id="view-secretaria">
+        <div class="view-header">
+          <h2 class="view-title">Painel da Secretária</h2>
+        </div>
+        <div class="sec-grid">
+
+          <!-- NFs Pendentes -->
+          <div class="card sec-card">
+            <div class="card-header">
+              <h3>Notas Fiscais Pendentes</h3>
+              <span class="badge-pill" id="nf-count-pill">0</span>
+            </div>
+            <div class="nf-actions">
+              <a href="https://www.nfse.gov.br/EmissorNacional/Login" target="_blank" rel="noopener" class="nf-link-btn">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                NFS-e Nacional
+              </a>
+              <a href="https://nfe.prefeitura.sp.gov.br/login.aspx" target="_blank" rel="noopener" class="nf-link-btn">
+                <svg viewBox="0 0 20 20" fill="currentColor" width="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                NFS-e São Paulo
+              </a>
+            </div>
+            <div class="nf-list" id="nf-list">
+              <div class="empty-state">Nenhuma NF pendente de emissão.</div>
+            </div>
+          </div>
+
+          <!-- Lançamento Rápido -->
+          <div class="card sec-card">
+            <div class="card-header"><h3>Lançamento Rápido</h3></div>
+            <form id="form-rapido" autocomplete="off">
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="r-data">Data</label>
+                  <input type="date" id="r-data" required>
+                </div>
+                <div class="form-group">
+                  <label for="r-paciente">Paciente</label>
+                  <input type="text" id="r-paciente" required placeholder="Nome do paciente">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="r-tipo">Tipo</label>
+                  <select id="r-tipo">
+                    <option value="primeira">Primeira Consulta</option>
+                    <option value="retorno" selected>Retorno</option>
+                    <option value="teleconsulta">Teleconsulta</option>
+                    <option value="atestado">Atestado</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="r-valor">Valor (R$)</label>
+                  <input type="number" id="r-valor" step="0.01" min="0" placeholder="0,00">
+                </div>
+              </div>
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="r-status">Status</label>
+                  <select id="r-status">
+                    <option value="pix">Recebido PIX</option>
+                    <option value="pendente">Pendente</option>
+                    <option value="gratuito">Gratuito</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="r-nf">Nota Fiscal</label>
+                  <select id="r-nf">
+                    <option value="pendente">Pendente</option>
+                    <option value="emitida">Emitida</option>
+                    <option value="isenta">Isenta</option>
+                  </select>
+                </div>
+              </div>
+              <button type="submit" class="btn btn-primary btn-full">Salvar Lançamento</button>
+            </form>
+          </div>
+
+          <!-- Anotações Internas -->
+          <div class="card sec-card sec-card-wide">
+            <div class="card-header">
+              <h3>Anotações Internas</h3>
+              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
+            </div>
+            <div class="notas-list" id="notas-list">
+              <div class="empty-state">Nenhuma anotação.</div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ── DRE ──────────────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-dre">
+        <div class="view-header">
+          <h2 class="view-title">DRE — Demonstrativo de Resultado</h2>
+          <span class="view-period" id="dre-period"></span>
+        </div>
+        <div class="dre-layout">
+          <div class="card dre-table-card">
+            <div class="table-wrap">
+              <table class="dre-table" id="dre-table">
+                <thead>
+                  <tr><th>Descrição</th><th class="text-right">Valor (R$)</th><th class="text-right">%</th></tr>
+                </thead>
+                <tbody id="tbody-dre"></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="dre-charts">
+            <div class="card chart-card-sm">
+              <div class="card-header"><h3>Receitas por Tipo</h3></div>
+              <div class="chart-wrap-sm"><canvas id="chart-rec-tipo"></canvas></div>
+            </div>
+            <div class="card chart-card-sm">
+              <div class="card-header"><h3>Despesas por Categoria</h3></div>
+              <div class="chart-wrap-sm"><canvas id="chart-desp-cat"></canvas></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── IMPORTAR CSV ──────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-import">
+        <div class="view-header">
+          <h2 class="view-title">Importar CSV — iClinic</h2>
+        </div>
+        <div class="card import-card">
+          <div class="import-instructions">
+            <h3>Como importar</h3>
+            <ol>
+              <li>No iClinic, exporte o relatório de atendimentos em formato CSV.</li>
+              <li>Faça o upload do arquivo abaixo.</li>
+              <li>Mapeie as colunas do CSV para os campos do sistema.</li>
+              <li>Revise a pré-visualização e confirme a importação.</li>
+            </ol>
+            <p class="import-note">Separadores aceitos: vírgula <code>,</code> ou ponto-e-vírgula <code>;</code>. A primeira linha deve conter os cabeçalhos.</p>
+          </div>
+
+          <label class="upload-area" id="upload-area">
+            <input type="file" id="csv-input" accept=".csv,.txt" class="hidden">
+            <div class="upload-icon">📂</div>
+            <div class="upload-text">Clique para selecionar o arquivo CSV</div>
+            <div class="upload-sub">ou arraste e solte aqui</div>
+          </label>
+
+          <div class="import-mapping hidden" id="import-mapping">
+            <h3>Mapeamento de Colunas</h3>
+            <p class="import-note">Selecione qual coluna do seu CSV corresponde a cada campo:</p>
+            <div class="mapping-grid" id="mapping-grid"></div>
+            <h4 style="margin:20px 0 10px">Pré-visualização (5 primeiras linhas)</h4>
+            <div class="table-wrap"><table class="data-table" id="import-preview-table"></table></div>
+            <div class="import-actions">
+              <button class="btn btn-outline" id="btn-cancel-import">Cancelar</button>
+              <button class="btn btn-primary" id="btn-confirm-import">Importar Registros</button>
+            </div>
+          </div>
+
+          <div class="import-result hidden" id="import-result"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ══ MODAL: RECEBIMENTO ════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-rec">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-rec-title">Novo Recebimento</h3>
+        <button class="modal-close-btn" data-close="modal-rec">✕</button>
+      </div>
+      <form id="form-rec" autocomplete="off">
+        <input type="hidden" id="rec-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="rec-data">Data *</label>
+            <input type="date" id="rec-data" required>
+          </div>
+          <div class="form-group">
+            <label for="rec-paciente">Paciente *</label>
+            <input type="text" id="rec-paciente" required placeholder="Nome completo">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="rec-tipo">Tipo de Consulta *</label>
+            <select id="rec-tipo" required>
+              <option value="">Selecione…</option>
+              <option value="primeira">Primeira Consulta</option>
+              <option value="retorno">Retorno</option>
+              <option value="teleconsulta">Teleconsulta</option>
+              <option value="atestado">Atestado</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="rec-valor">Valor (R$) *</label>
+            <input type="number" id="rec-valor" step="0.01" min="0" placeholder="0,00" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="rec-status">Status *</label>
+            <select id="rec-status" required>
+              <option value="">Selecione…</option>
+              <option value="pix">Recebido via PIX</option>
+              <option value="pendente">Pendente</option>
+              <option value="gratuito">Gratuito</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="rec-nf">Nota Fiscal *</label>
+            <select id="rec-nf" required>
+              <option value="">Selecione…</option>
+              <option value="pendente">Pendente</option>
+              <option value="emitida">Emitida</option>
+              <option value="isenta">Isenta</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="rec-obs">Observações</label>
+          <textarea id="rec-obs" rows="3" placeholder="Informações adicionais…"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="modal-rec">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: DESPESA ════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-desp">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-desp-title">Nova Despesa</h3>
+        <button class="modal-close-btn" data-close="modal-desp">✕</button>
+      </div>
+      <form id="form-desp" autocomplete="off">
+        <input type="hidden" id="desp-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="desp-data">Data *</label>
+            <input type="date" id="desp-data" required>
+          </div>
+          <div class="form-group">
+            <label for="desp-desc">Descrição *</label>
+            <input type="text" id="desp-desc" required placeholder="Ex: Aluguel sala novembro">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="desp-cat">Categoria *</label>
+            <select id="desp-cat" required>
+              <option value="">Selecione…</option>
+              <option value="aluguel">Aluguel</option>
+              <option value="iclinic">iClinic</option>
+              <option value="secretaria">Secretária</option>
+              <option value="contador">Contador</option>
+              <option value="material">Material</option>
+              <option value="impostos">Impostos</option>
+              <option value="outros">Outros</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="desp-rec">Recorrência</label>
+            <select id="desp-rec">
+              <option value="unica">Única</option>
+              <option value="mensal">Mensal</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="desp-valor">Valor (R$) *</label>
+          <input type="number" id="desp-valor" step="0.01" min="0" placeholder="0,00" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="modal-desp">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: NOTA ═══════════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-nota">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3>Anotação Interna</h3>
+        <button class="modal-close-btn" data-close="modal-nota">✕</button>
+      </div>
+      <form id="form-nota" autocomplete="off">
+        <input type="hidden" id="nota-id">
+        <div class="form-group">
+          <label for="nota-content">Anotação *</label>
+          <textarea id="nota-content" rows="6" placeholder="Digite sua anotação aqui…" required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="modal-nota">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ TOAST ══════════════════════════════════════════════════════════════ -->
+  <div class="toast hidden" id="toast">
+    <span class="toast-icon" id="toast-icon"></span>
+    <span class="toast-msg" id="toast-msg"></span>
+  </div>
+
+  <!-- ══ LOADING ════════════════════════════════════════════════════════════ -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
