@@ -1783,6 +1783,200 @@ function setProgress(pct, label) {
   el('import-progress-label').textContent = label;
 }
 
+// ── IMPORTAÇÃO CONTROLE SECRETÁRIA ───────────────────────────────────────────
+const csvInputSec   = el('csv-input-sec');
+const uploadAreaSec = el('upload-area-sec');
+
+uploadAreaSec.addEventListener('dragover',  e => { e.preventDefault(); uploadAreaSec.classList.add('dragover'); });
+uploadAreaSec.addEventListener('dragleave', ()  => uploadAreaSec.classList.remove('dragover'));
+uploadAreaSec.addEventListener('drop', e => {
+  e.preventDefault(); uploadAreaSec.classList.remove('dragover');
+  handleSecretariaFiles([...e.dataTransfer.files]);
+});
+csvInputSec.addEventListener('change', () => handleSecretariaFiles([...csvInputSec.files]));
+
+el('btn-cancel-import-sec').addEventListener('click', resetSecretariaImport);
+el('btn-run-import-sec').addEventListener('click',    runSecretariaImport);
+
+let secFiles = [];
+
+function handleSecretariaFiles(files) {
+  secFiles = [];
+  const detected = [];
+  let loaded = 0;
+  for (const file of files) {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const text = e.target.result;
+      const isValid = text.includes('DATA CONSULTA') && text.includes('NF ENVIADA');
+      if (isValid) {
+        secFiles.push({ file, text, name: file.name });
+        detected.push({ name: file.name, ok: true });
+      } else {
+        detected.push({ name: file.name, ok: false });
+      }
+      loaded++;
+      if (loaded === files.length) renderSecFilesPreview(detected);
+    };
+    reader.readAsText(file, 'UTF-8');
+  }
+}
+
+function renderSecFilesPreview(detected) {
+  const preview = el('import-files-preview-sec');
+  preview.innerHTML = detected.map(f => `
+    <div class="import-file-row">
+      <span class="import-file-icon">${f.ok ? '📋' : '📄'}</span>
+      <span class="import-file-name">${esc(f.name)}</span>
+      <span class="import-file-type ${f.ok ? 'detected' : 'unknown'}">${f.ok ? 'Controle Secretária' : 'Não reconhecido'}</span>
+    </div>`).join('');
+  preview.classList.remove('hidden');
+  el('import-actions-bar-sec').classList.remove('hidden');
+  el('import-result-sec').classList.add('hidden');
+}
+
+function resetSecretariaImport() {
+  secFiles = [];
+  csvInputSec.value = '';
+  el('import-files-preview-sec').classList.add('hidden');
+  el('import-actions-bar-sec').classList.add('hidden');
+  el('import-progress-sec').classList.add('hidden');
+  el('import-result-sec').classList.add('hidden');
+}
+
+function setProgressSec(pct, label) {
+  el('import-progress-fill-sec').style.width = pct + '%';
+  el('import-progress-label-sec').textContent = label;
+}
+
+function normalizeName(name) { return normalizeStr(name); }
+
+function parseSecretariaCSV(text) {
+  const lines = text.split(/\r?\n/);
+  const headerIdx = lines.findIndex(l => l.includes('DATA CONSULTA'));
+  if (headerIdx < 0) return [];
+
+  const hdrs = splitCSVLine(lines[headerIdx], ',').map(h => h.replace(/^"|"$/g, '').trim());
+  const rows = [];
+
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const vals = splitCSVLine(line, ',').map(v => v.replace(/^"|"$/g, '').trim());
+    // Skip day-of-week separator rows: only col 0 has text, rest are empty/commas
+    const filled = vals.filter(v => v && v !== '-');
+    if (filled.length <= 1) continue;
+    // Must start with a date pattern DD/MM/YYYY
+    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(vals[0])) continue;
+    rows.push(Object.fromEntries(hdrs.map((h, j) => [h, vals[j] || ''])));
+  }
+  return rows;
+}
+
+async function runSecretariaImport() {
+  if (!secFiles.length) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
+
+  el('import-actions-bar-sec').classList.add('hidden');
+  el('import-progress-sec').classList.remove('hidden');
+  setProgressSec(0, 'Iniciando…');
+
+  const results = { updated: 0, created: 0, skipped: 0 };
+
+  try {
+    // Build lookup: "YYYY-MM-DD_normalizedName" → recebimento
+    const recMap = {};
+    S.data.recebimentos.forEach(r => {
+      if (!r.date || !r.patient) return;
+      recMap[`${r.date}_${normalizeName(r.patient)}`] = r;
+    });
+
+    // Build lookup: normalizedName → patient (for new records)
+    const patByName = {};
+    S.data.patients.forEach(p => { if (p.name) patByName[normalizeName(p.name)] = p; });
+
+    // Collect all rows from all selected files
+    const allRows = [];
+    for (const f of secFiles) allRows.push(...parseSecretariaCSV(f.text));
+
+    setProgressSec(10, `${allRows.length} registros encontrados…`);
+
+    let i = 0;
+    for (const row of allRows) {
+      const date = parseBRDate(row['DATA CONSULTA'] || '');
+      if (!date) { results.skipped++; i++; continue; }
+
+      const patNameRaw = (row['PACIENTE'] || '').trim();
+      if (!patNameRaw) { results.skipped++; i++; continue; }
+      const patName  = capitalizeName(patNameRaw);
+      const normNm   = normalizeName(patName);
+      const key      = `${date}_${normNm}`;
+
+      const meio       = (row['MEIO'] || '').trim().toLowerCase();
+      const consType   = meio === 'online' ? 'teleconsulta' : 'presencial';
+      const value      = parseBRNumber((row['VALOR'] || '').replace(/R\$\s*/, ''));
+      const pagamento  = (row['PAGAMENTO']  || '').trim().toLowerCase();
+      const nfEnviada  = (row['NF ENVIADA'] || '').trim().toLowerCase();
+      const status     = value === 0 ? 'gratuito' : (pagamento === 'sim' ? 'pix' : 'pendente');
+      const invStatus  = value === 0 ? 'isenta'   : (nfEnviada === 'sim' ? 'emitida' : 'pendente');
+      const payDateRaw = (row['DATA PAGAMENTO'] || '').trim();
+      const paymentDate = (payDateRaw && payDateRaw !== '-') ? parseBRDate(payDateRaw) : '';
+      const obsRaw     = (row['OBSERVAÇÃO'] || '').trim();
+      const obs        = obsRaw && obsRaw !== '-' ? obsRaw : '';
+
+      const existing = recMap[key];
+
+      if (existing) {
+        const updates = { consultationType: consType, value, status, invoiceStatus: invStatus, updatedAt: serverTimestamp() };
+        if (paymentDate) updates.paymentDate = paymentDate;
+        if (obs && !existing.notes) updates.notes = obs;
+        await updateDoc(doc(db, 'recebimentos', existing.id), updates);
+        results.updated++;
+      } else {
+        const pat      = patByName[normNm] || null;
+        const patDocId = pat ? pat.id : null;
+        const patIcId  = pat ? (pat.iclinicPatientId || '') : '';
+        const newRec = {
+          date, patient: patName, patientId: patDocId,
+          iclinicPatientId: patIcId,
+          consultationType: consType, value, status,
+          invoiceStatus: invStatus, invoiceNumber: '',
+          notes: obs,
+          source: 'secretaria',
+          createdAt: serverTimestamp(), createdBy: S.user.uid,
+        };
+        if (paymentDate) newRec.paymentDate = paymentDate;
+        await addDoc(collection(db, 'recebimentos'), newRec);
+        results.created++;
+      }
+
+      i++;
+      if (i % 10 === 0) setProgressSec(10 + Math.round(i / allRows.length * 85), `Processando: ${i}/${allRows.length}…`);
+    }
+
+    await reloadCollection('recebimentos');
+    updateBadges();
+    setProgressSec(100, 'Concluído!');
+
+    const res = el('import-result-sec');
+    res.className = 'import-result success';
+    res.innerHTML = `
+      <strong>✓ Fusão concluída!</strong><br><br>
+      ✅ <strong>${results.updated} recebimentos atualizados</strong> (match por data + nome)<br>
+      ➕ <strong>${results.created} recebimentos criados</strong> (sem correspondência no iClinic)<br>
+      ${results.skipped ? `⚠ ${results.skipped} linha${results.skipped > 1 ? 's' : ''} ignorada${results.skipped > 1 ? 's' : ''}.<br>` : ''}
+      <br>Confira em <strong>Recebimentos</strong> — novos registros aparecem com a origem "secretaria".
+    `;
+    res.classList.remove('hidden');
+    el('import-progress-sec').classList.add('hidden');
+    showToast('Fusão concluída!', 'success');
+  } catch (err) {
+    handleErr(err);
+    setProgressSec(0, '');
+    el('import-progress-sec').classList.add('hidden');
+    el('import-actions-bar-sec').classList.remove('hidden');
+  }
+}
+
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
