@@ -1873,6 +1873,36 @@ function parseSecretariaCSV(text) {
   return rows;
 }
 
+// Fuzzy name match within same-date candidates.
+// Returns the single recebimento whose name best matches targetNorm, or null if ambiguous/not found.
+function findRecByNameFuzzy(targetNorm, candidates) {
+  // 1. Exact normalized match
+  const exact = candidates.find(c => normalizeName(c.patient) === targetNorm);
+  if (exact) return exact;
+
+  const targetTokens = targetNorm.split(' ').filter(Boolean);
+
+  // 2. All tokens of the CSV name appear in the stored name (handles iClinic adding extra particles)
+  const supersets = candidates.filter(c => {
+    const stored = normalizeName(c.patient).split(' ').filter(Boolean);
+    return targetTokens.every(t => stored.includes(t));
+  });
+  if (supersets.length === 1) return supersets[0];
+
+  // 3. First + last token match (handles middle-name differences)
+  if (targetTokens.length >= 2) {
+    const first = targetTokens[0];
+    const last  = targetTokens[targetTokens.length - 1];
+    const fl = candidates.filter(c => {
+      const stored = normalizeName(c.patient).split(' ').filter(Boolean);
+      return stored.includes(first) && stored.includes(last);
+    });
+    if (fl.length === 1) return fl[0];
+  }
+
+  return null;
+}
+
 async function runSecretariaImport() {
   if (!secFiles.length) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
 
@@ -1880,14 +1910,17 @@ async function runSecretariaImport() {
   el('import-progress-sec').classList.remove('hidden');
   setProgressSec(0, 'Iniciando…');
 
-  const results = { updated: 0, created: 0, skipped: 0 };
+  const results = { updated: 0, fuzzy: 0, created: 0, skipped: 0 };
 
   try {
-    // Build lookup: "YYYY-MM-DD_normalizedName" → recebimento
-    const recMap = {};
+    // Build lookup: "YYYY-MM-DD_normalizedName" → recebimento (exact)
+    const recMap    = {};
+    // Build lookup: date → [recebimentos] (for fuzzy fallback)
+    const recByDate = {};
     S.data.recebimentos.forEach(r => {
       if (!r.date || !r.patient) return;
       recMap[`${r.date}_${normalizeName(r.patient)}`] = r;
+      (recByDate[r.date] = recByDate[r.date] || []).push(r);
     });
 
     // Build lookup: normalizedName → patient (for new records)
@@ -1909,7 +1942,6 @@ async function runSecretariaImport() {
       if (!patNameRaw) { results.skipped++; i++; continue; }
       const patName  = capitalizeName(patNameRaw);
       const normNm   = normalizeName(patName);
-      const key      = `${date}_${normNm}`;
 
       const meio       = (row['MEIO'] || '').trim().toLowerCase();
       const consType   = meio === 'online' ? 'teleconsulta' : 'presencial';
@@ -1923,16 +1955,23 @@ async function runSecretariaImport() {
       const obsRaw     = (row['OBSERVAÇÃO'] || '').trim();
       const obs        = obsRaw && obsRaw !== '-' ? obsRaw : '';
 
-      const existing = recMap[key];
+      // Exact match first, then fuzzy within same date
+      let existing = recMap[`${date}_${normNm}`];
+      let wasFuzzy = false;
+      if (!existing) {
+        existing = findRecByNameFuzzy(normNm, recByDate[date] || []);
+        if (existing) wasFuzzy = true;
+      }
 
       if (existing) {
         const updates = { consultationType: consType, value, status, invoiceStatus: invStatus, updatedAt: serverTimestamp() };
         if (paymentDate) updates.paymentDate = paymentDate;
         if (obs && !existing.notes) updates.notes = obs;
         await updateDoc(doc(db, 'recebimentos', existing.id), updates);
-        results.updated++;
+        if (wasFuzzy) results.fuzzy++; else results.updated++;
       } else {
-        const pat      = patByName[normNm] || null;
+        const patFuzzy = !patByName[normNm] ? S.data.patients.find(p => findRecByNameFuzzy(normNm, [{ patient: p.name }])) : null;
+        const pat      = patByName[normNm] || patFuzzy || null;
         const patDocId = pat ? pat.id : null;
         const patIcId  = pat ? (pat.iclinicPatientId || '') : '';
         const newRec = {
@@ -1959,9 +1998,10 @@ async function runSecretariaImport() {
 
     const res = el('import-result-sec');
     res.className = 'import-result success';
+    const totalUpdated = results.updated + results.fuzzy;
     res.innerHTML = `
       <strong>✓ Fusão concluída!</strong><br><br>
-      ✅ <strong>${results.updated} recebimentos atualizados</strong> (match por data + nome)<br>
+      ✅ <strong>${totalUpdated} recebimentos atualizados</strong>${results.fuzzy ? ` (${results.fuzzy} por correspondência aproximada de nome)` : ''}<br>
       ➕ <strong>${results.created} recebimentos criados</strong> (sem correspondência no iClinic)<br>
       ${results.skipped ? `⚠ ${results.skipped} linha${results.skipped > 1 ? 's' : ''} ignorada${results.skipped > 1 ? 's' : ''}.<br>` : ''}
       <br>Confira em <strong>Recebimentos</strong> — novos registros aparecem com a origem "secretaria".
