@@ -7,7 +7,7 @@ import { initializeApp }                                      from 'https://www.
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc,
-         doc, query, orderBy, serverTimestamp, writeBatch, where }
+         doc, query, orderBy, serverTimestamp, writeBatch }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -25,7 +25,7 @@ const S = {
   role:            null,
   view:            'dashboard',
   filter:          { preset: 'mes', start: '', end: '' },
-  data:            { recebimentos: [], despesas: [], notas: [], patients: [] },
+  data:            { recebimentos: [], despesas: [], notas: [], patients: [], consultations: [] },
   charts:          { mensal: null, recTipo: null, despCat: null },
   editingRec:      null,
   editingDesp:     null,
@@ -33,6 +33,9 @@ const S = {
   editingPaciente: null,
   currentPatient:  null,
   importFiles:     { patient: null, bill: null, event: null },
+  calendarYear:    new Date().getFullYear(),
+  calendarMonth:   new Date().getMonth(),
+  calendarSelDay:  null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,7 +125,7 @@ function navigateTo(view) {
   const target = el('view-' + view);
   if (target) target.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
-  el('filter-bar').classList.toggle('hidden', view === 'import' || view === 'paciente-detalhe');
+  el('filter-bar').classList.toggle('hidden', ['import','paciente-detalhe','agenda'].includes(view));
   renderView(view);
 }
 
@@ -145,6 +148,7 @@ function renderView(view) {
     case 'inadimplencia':renderInadimplencia();break;
     case 'secretaria':   renderSecretaria();   break;
     case 'dre':          renderDRE();          break;
+    case 'agenda':       renderAgenda();       break;
   }
 }
 
@@ -203,16 +207,18 @@ function filterByPeriod(arr) {
 async function loadAll() {
   showLoading();
   try {
-    const [recs, desps, notas, patients] = await Promise.all([
-      fetchCollection('recebimentos', [orderBy('date', 'desc')]),
-      fetchCollection('despesas',     [orderBy('date', 'desc')]),
-      fetchCollection('notas',        [orderBy('createdAt', 'desc')]),
-      fetchCollection('patients',     [orderBy('name', 'asc')]),
+    const [recs, desps, notas, patients, consults] = await Promise.all([
+      fetchCollection('recebimentos',  [orderBy('date', 'desc')]),
+      fetchCollection('despesas',      [orderBy('date', 'desc')]),
+      fetchCollection('notas',         [orderBy('createdAt', 'desc')]),
+      fetchCollection('patients',      [orderBy('name', 'asc')]),
+      fetchCollection('consultations', [orderBy('date', 'desc')]),
     ]);
-    S.data.recebimentos = recs;
-    S.data.despesas     = desps;
-    S.data.notas        = notas;
-    S.data.patients     = patients;
+    S.data.recebimentos  = recs;
+    S.data.despesas      = desps;
+    S.data.notas         = notas;
+    S.data.patients      = patients;
+    S.data.consultations = consults;
     updateBadges();
   } catch (err) {
     console.error(err);
@@ -229,7 +235,11 @@ async function fetchCollection(name, constraints = []) {
 }
 
 async function reloadCollection(name) {
-  const ords = { notas: [orderBy('createdAt','desc')], patients: [orderBy('name','asc')] };
+  const ords = {
+    notas:         [orderBy('createdAt','desc')],
+    patients:      [orderBy('name','asc')],
+    consultations: [orderBy('date','desc')],
+  };
   S.data[name] = await fetchCollection(name, ords[name] || [orderBy('date','desc')]);
 }
 
@@ -346,6 +356,161 @@ async function deletePatient(id) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// MARK ALL NFs EMITTED
+// ─────────────────────────────────────────────────────────────────────────────
+async function markAllPastNFsEmitted() {
+  const todayStr = today();
+  const targets  = S.data.recebimentos.filter(r =>
+    r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayStr
+  );
+  if (!targets.length) { showToast('Nenhuma NF pendente até hoje.', 'info'); return; }
+  if (!confirm(`Marcar ${targets.length} nota${targets.length > 1 ? 's fiscais' : ' fiscal'} como emitida${targets.length > 1 ? 's' : ''}?\n\nEsta ação não pode ser desfeita.`)) return;
+
+  showLoading();
+  try {
+    for (let i = 0; i < targets.length; i += 400) {
+      const batch = writeBatch(db);
+      targets.slice(i, i + 400).forEach(r => {
+        batch.update(doc(db, 'recebimentos', r.id), { invoiceStatus: 'emitida', updatedAt: serverTimestamp() });
+      });
+      await batch.commit();
+    }
+    await reloadCollection('recebimentos');
+    updateBadges();
+    renderView(S.view);
+    showToast(`${targets.length} NF${targets.length > 1 ? 's marcadas' : ' marcada'} como emitida${targets.length > 1 ? 's' : ''}!`, 'success');
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DUPLICATE DETECTION & MERGE
+// ─────────────────────────────────────────────────────────────────────────────
+function normalizePhone(phone) { return (phone || '').replace(/\D/g, ''); }
+function normalizeStr(str) {
+  return (str || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+function detectDuplicates() {
+  const byPhone = {};
+  const byName  = {};
+
+  S.data.patients.forEach(p => {
+    const phone = normalizePhone(p.phone || '');
+    if (phone.length >= 8) {
+      if (!byPhone[phone]) byPhone[phone] = [];
+      byPhone[phone].push(p);
+    }
+    const norm = normalizeStr(p.name || '');
+    if (norm.length > 3) {
+      if (!byName[norm]) byName[norm] = [];
+      byName[norm].push(p);
+    }
+  });
+
+  const seen   = new Set();
+  const groups = [];
+
+  [...Object.values(byPhone), ...Object.values(byName)]
+    .filter(g => g.length > 1)
+    .forEach(g => {
+      for (let i = 0; i < g.length - 1; i++) {
+        for (let j = i + 1; j < g.length; j++) {
+          const key = [g[i].id, g[j].id].sort().join('_');
+          if (!seen.has(key)) {
+            seen.add(key);
+            groups.push([g[i], g[j]]);
+          }
+        }
+      }
+    });
+
+  return groups;
+}
+
+function renderDuplicatesSection() {
+  const groups  = detectDuplicates();
+  const section = el('dup-section');
+  if (!groups.length) { section.classList.add('hidden'); return; }
+
+  section.classList.remove('hidden');
+  setText('dup-title', `${groups.length} possível duplicata${groups.length !== 1 ? 's' : ''} detectada${groups.length !== 1 ? 's' : ''} — verifique e mescle se necessário`);
+
+  el('dup-groups').innerHTML = groups.map(([a, b]) => {
+    const sA = getPatientStats(a.id, a.name);
+    const sB = getPatientStats(b.id, b.name);
+    const pA = normalizePhone(a.phone || '');
+    const pB = normalizePhone(b.phone || '');
+    const samePhone = pA.length >= 8 && pA === pB;
+    const sameName  = normalizeStr(a.name || '') === normalizeStr(b.name || '');
+    const reason    = [samePhone && 'mesmo telefone', sameName && 'mesmo nome'].filter(Boolean).join(' + ');
+
+    const rowHtml = (pac, keepId, dropId, stats) => `
+      <div class="dup-patient-row">
+        <div class="dup-patient-info">
+          <strong>${esc(pac.name || '—')}</strong>
+          <div class="dup-patient-meta">${esc(pac.phone || '—')} · ${stats.totalConsultas} consulta${stats.totalConsultas !== 1 ? 's' : ''} · ${fmtBRL(stats.totalPago)} pago</div>
+        </div>
+        <button class="dup-merge-btn" data-action="merge-pac" data-keep="${keepId}" data-drop="${dropId}">Manter este →</button>
+      </div>`;
+
+    return `<div class="dup-group">
+      <div class="dup-group-header">${reason || 'Cadastros similares'}</div>
+      <div class="dup-group-body">
+        ${rowHtml(a, a.id, b.id, sA)}
+        ${rowHtml(b, b.id, a.id, sB)}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function mergePacientes(keepId, dropId) {
+  const keepPac = S.data.patients.find(p => p.id === keepId);
+  const dropPac = S.data.patients.find(p => p.id === dropId);
+  if (!keepPac || !dropPac) return;
+
+  if (!confirm(`Manter "${keepPac.name}" e excluir "${dropPac.name}"?\n\nTodos os recebimentos e agendamentos serão transferidos. Esta ação não pode ser desfeita.`)) return;
+
+  showLoading();
+  try {
+    const recsToMove    = S.data.recebimentos.filter(r => r.patientId === dropId);
+    const consultsToMove = S.data.consultations.filter(c => c.patientId === dropId);
+
+    const updates = [
+      ...recsToMove.map(r    => ({ col: 'recebimentos',  id: r.id, data: { patientId: keepId, patient:     keepPac.name } })),
+      ...consultsToMove.map(c => ({ col: 'consultations', id: c.id, data: { patientId: keepId, patientName: keepPac.name } })),
+    ];
+
+    for (let i = 0; i < updates.length; i += 400) {
+      const batch = writeBatch(db);
+      updates.slice(i, i + 400).forEach(u =>
+        batch.update(doc(db, u.col, u.id), { ...u.data, updatedAt: serverTimestamp() })
+      );
+      await batch.commit();
+    }
+
+    // Carry over phone2 from the deleted patient if it adds info
+    const extras = {};
+    if (dropPac.phone && dropPac.phone !== keepPac.phone && !keepPac.phone2) extras.phone2 = dropPac.phone;
+
+    if (Object.keys(extras).length) {
+      await updateDoc(doc(db, 'patients', keepId), { ...extras, updatedAt: serverTimestamp() });
+    }
+
+    await deleteDoc(doc(db, 'patients', dropId));
+
+    await Promise.all([
+      reloadCollection('patients'),
+      reloadCollection('recebimentos'),
+      reloadCollection('consultations'),
+    ]);
+
+    updateBadges();
+    renderPacientes();
+    showToast('Pacientes mesclados com sucesso!', 'success');
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // DASHBOARD
 // ─────────────────────────────────────────────────────────────────────────────
 function renderDashboard() {
@@ -383,8 +548,8 @@ function renderDashboard() {
 }
 
 function renderMensalChart() {
-  const months   = getMonthlyData(6);
-  const ctx      = el('chart-mensal').getContext('2d');
+  const months = getMonthlyData(6);
+  const ctx    = el('chart-mensal').getContext('2d');
   if (S.charts.mensal) S.charts.mensal.destroy();
   S.charts.mensal = new Chart(ctx, {
     type: 'bar',
@@ -456,23 +621,155 @@ function renderRecent() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// AGENDA / CALENDAR
+// ─────────────────────────────────────────────────────────────────────────────
+el('btn-cal-prev').addEventListener('click', () => {
+  S.calendarMonth--;
+  if (S.calendarMonth < 0) { S.calendarMonth = 11; S.calendarYear--; }
+  renderAgenda();
+});
+el('btn-cal-next').addEventListener('click', () => {
+  S.calendarMonth++;
+  if (S.calendarMonth > 11) { S.calendarMonth = 0; S.calendarYear++; }
+  renderAgenda();
+});
+el('btn-cal-close-detail').addEventListener('click', () => {
+  S.calendarSelDay = null;
+  el('calendar-detail').classList.add('hidden');
+  document.querySelectorAll('.cal-day.selected').forEach(d => d.classList.remove('selected'));
+});
+
+function renderAgenda() {
+  const year  = S.calendarYear;
+  const month = S.calendarMonth;
+  const monthNames = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  setText('cal-month-label', `${monthNames[month]} ${year}`);
+
+  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const dayMap   = {};
+  S.data.consultations.forEach(c => {
+    if (c.date && c.date.startsWith(monthStr)) {
+      const day = c.date.split('-')[2];
+      if (!dayMap[day]) dayMap[day] = [];
+      dayMap[day].push(c);
+    }
+  });
+
+  const firstDay    = new Date(year, month, 1).getDay();
+  const lastDate    = new Date(year, month + 1, 0).getDate();
+  const prevLast    = new Date(year, month, 0).getDate();
+  const todayStr    = today();
+  const statusOrder = ['cp','at','co','sc','re','na'];
+
+  let cells = '';
+  let count = 0;
+
+  for (let d = firstDay - 1; d >= 0; d--) {
+    cells += `<div class="cal-day other-month"><div class="cal-day-num">${prevLast - d}</div></div>`;
+    count++;
+  }
+
+  for (let d = 1; d <= lastDate; d++) {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isToday = dateStr === todayStr;
+    const isSel   = dateStr === S.calendarSelDay;
+    const events  = (dayMap[String(d).padStart(2, '0')] || [])
+      .sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
+
+    const chips = events.slice(0, 3).map(e => {
+      const st  = e.status || 'sc';
+      const nm  = (e.patientName || '?').split(' ')[0];
+      return `<div class="cal-chip cal-chip-${st}" title="${esc(e.patientName || '')} — ${st}">${esc(nm)}</div>`;
+    }).join('');
+    const more = events.length > 3 ? `<div class="cal-chip cal-chip-more">+${events.length - 3}</div>` : '';
+
+    cells += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" data-date="${dateStr}" data-action="cal-select-day">
+      <div class="cal-day-num">${d}</div>${chips}${more}
+    </div>`;
+    count++;
+  }
+
+  const remaining = (7 - (count % 7)) % 7;
+  for (let d = 1; d <= remaining; d++) {
+    cells += `<div class="cal-day other-month"><div class="cal-day-num">${d}</div></div>`;
+  }
+
+  el('calendar-body').innerHTML = cells;
+
+  if (S.calendarSelDay && S.calendarSelDay.startsWith(monthStr)) {
+    renderCalendarDetail(S.calendarSelDay);
+  } else {
+    S.calendarSelDay = null;
+    el('calendar-detail').classList.add('hidden');
+  }
+}
+
+function selectCalendarDay(dateStr) {
+  const wasSelected = S.calendarSelDay === dateStr;
+  document.querySelectorAll('.cal-day.selected').forEach(d => d.classList.remove('selected'));
+  if (wasSelected) {
+    S.calendarSelDay = null;
+    el('calendar-detail').classList.add('hidden');
+  } else {
+    S.calendarSelDay = dateStr;
+    const dayEl = document.querySelector(`.cal-day[data-date="${dateStr}"]`);
+    if (dayEl) dayEl.classList.add('selected');
+    renderCalendarDetail(dateStr);
+  }
+}
+
+function renderCalendarDetail(dateStr) {
+  const events = S.data.consultations
+    .filter(c => c.date === dateStr)
+    .sort((a, b) => (a.patientName || '').localeCompare(b.patientName || ''));
+
+  const [y, m, d] = dateStr.split('-');
+  setText('cal-detail-title', `${parseInt(d)}/${parseInt(m)}/${y} — ${events.length} consulta${events.length !== 1 ? 's' : ''}`);
+
+  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado' };
+
+  el('cal-detail-list').innerHTML = events.length === 0
+    ? '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>'
+    : events.map(e => {
+        const nameEl = e.patientId
+          ? `<span class="patient-link" data-patient="${e.patientId}">${esc(e.patientName || '—')}</span>`
+          : esc(e.patientName || '—');
+        return `<div class="cal-detail-item">
+          <div class="cal-detail-dot cal-status-${e.status || 'sc'}"></div>
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:600;color:var(--text)">${nameEl}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">${statusLabels[e.status] || e.status || '—'} · ${labels.consultationType[e.consultationType] || e.consultationType || '—'}</div>
+            ${e.notes ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>` : ''}
+          </div>
+          <div style="text-align:right;flex-shrink:0;font-weight:700;color:var(--text)">${e.value ? fmtBRL(e.value) : '—'}</div>
+        </div>`;
+      }).join('');
+
+  el('calendar-detail').classList.remove('hidden');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PACIENTES VIEW
 // ─────────────────────────────────────────────────────────────────────────────
 el('btn-novo-paciente').addEventListener('click', () => openModalPaciente());
 
 el('form-pac').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const nome = el('pac-nome').value.trim();
-  const sobre= el('pac-sobrenome').value.trim();
+  const nome  = el('pac-nome').value.trim();
+  const sobre = el('pac-sobrenome').value.trim();
   const data = {
-    name:      `${nome} ${sobre}`,
-    firstName: nome,
-    lastName:  sobre,
-    phone:     el('pac-telefone').value.trim(),
-    email:     el('pac-email').value.trim(),
-    birthDate: el('pac-nascimento').value,
-    status:    el('pac-status').value,
-    notes:     el('pac-obs').value.trim(),
+    name:       capitalizeName(`${nome} ${sobre}`),
+    firstName:  capitalizeName(nome),
+    lastName:   capitalizeName(sobre),
+    phone:      el('pac-telefone').value.trim(),
+    phone2:     el('pac-telefone2').value.trim(),
+    email:      el('pac-email').value.trim(),
+    cpf:        el('pac-cpf').value.trim(),
+    gender:     el('pac-sexo').value,
+    birthDate:  el('pac-nascimento').value,
+    status:     el('pac-status').value,
+    indication: el('pac-indicacao').value.trim(),
+    notes:      el('pac-obs').value.trim(),
   };
   await savePatient(data, S.editingPaciente);
   closeModal('modal-pac');
@@ -488,8 +785,10 @@ el('btn-edit-pac-atual').addEventListener('click', () => {
 el('search-pac').addEventListener('input', renderPacientes);
 
 function renderPacientes() {
+  renderDuplicatesSection();
+
   let pats = [...S.data.patients];
-  const q = el('search-pac').value.toLowerCase();
+  const q  = el('search-pac').value.toLowerCase();
   if (q) pats = pats.filter(p => (p.name||'').toLowerCase().includes(q));
 
   el('summary-pac').innerHTML = `${pats.length} paciente${pats.length!==1?'s':''}`;
@@ -524,11 +823,15 @@ function openModalPaciente(pac = null) {
   el('pac-id').value         = pac ? pac.id : '';
   el('pac-nome').value       = pac ? (pac.firstName || pac.name?.split(' ')[0] || '') : '';
   el('pac-sobrenome').value  = pac ? (pac.lastName  || pac.name?.split(' ').slice(1).join(' ') || '') : '';
-  el('pac-telefone').value   = pac ? (pac.phone || '') : '';
-  el('pac-email').value      = pac ? (pac.email || '') : '';
-  el('pac-nascimento').value = pac ? (pac.birthDate || '') : '';
+  el('pac-telefone').value   = pac ? (pac.phone  || '') : '';
+  el('pac-telefone2').value  = pac ? (pac.phone2 || '') : '';
+  el('pac-email').value      = pac ? (pac.email  || '') : '';
+  el('pac-cpf').value        = pac ? (pac.cpf    || '') : '';
+  el('pac-sexo').value       = pac ? (pac.gender || '') : '';
+  el('pac-nascimento').value = pac ? (pac.birthDate  || '') : '';
   el('pac-status').value     = pac ? (pac.status || 'ativo') : 'ativo';
-  el('pac-obs').value        = pac ? (pac.notes || '') : '';
+  el('pac-indicacao').value  = pac ? (pac.indication || '') : '';
+  el('pac-obs').value        = pac ? (pac.notes  || '') : '';
   openModal('modal-pac');
 }
 
@@ -562,9 +865,8 @@ function renderPacienteDetalhe(patientId) {
   el('det-status-badge').innerHTML = patientStatusBadge(pac.status);
 
   const stats = getPatientStats(patientId, pac.name);
-
-  // KPIs
   const freqTxt = stats.avgFrequency ? `a cada ${stats.avgFrequency} dias` : '—';
+
   el('pac-kpis').innerHTML = `
     <div class="kpi-card kpi-blue">
       <div class="kpi-label">Total de Consultas</div>
@@ -595,28 +897,25 @@ function renderPacienteDetalhe(patientId) {
       <div class="kpi-label">Ticket Médio</div>
       <div class="kpi-value">${stats.recs.filter(r=>r.status==='pix').length > 0 ? fmtBRL(stats.totalPago / stats.recs.filter(r=>r.status==='pix').length) : '—'}</div>
       <div class="kpi-meta">consultas pagas</div>
-    </div>
-  `;
+    </div>`;
 
-  // Info
   const age = pac.birthDate ? calcAge(pac.birthDate) : null;
-  el('pac-info-grid').innerHTML = `
-    <div class="pac-info-item">
-      <div class="pac-info-label">Telefone</div>
-      <div class="pac-info-value">${esc(pac.phone||'—')}</div>
-    </div>
-    <div class="pac-info-item">
-      <div class="pac-info-label">E-mail</div>
-      <div class="pac-info-value">${esc(pac.email||'—')}</div>
-    </div>
-    <div class="pac-info-item">
-      <div class="pac-info-label">Data de Nascimento</div>
-      <div class="pac-info-value">${pac.birthDate ? `${fmtDate(pac.birthDate)}${age!==null?' ('+age+' anos)':''}` : '—'}</div>
-    </div>
-    ${pac.notes ? `<div class="pac-info-item pac-info-wide"><div class="pac-info-label">Observações</div><div class="pac-info-value">${esc(pac.notes)}</div></div>` : ''}
-  `;
+  const genderMap = { m:'Masculino', f:'Feminino', o:'Outro' };
 
-  // History
+  const infoItems = [
+    ['Telefone', pac.phone || '—'],
+    pac.phone2    ? ['Telefone 2', pac.phone2]                                         : null,
+    ['E-mail', pac.email || '—'],
+    ['Data de Nascimento', pac.birthDate ? `${fmtDate(pac.birthDate)}${age !== null ? ' (' + age + ' anos)' : ''}` : '—'],
+    pac.gender    ? ['Sexo', genderMap[pac.gender] || pac.gender]                      : null,
+    pac.cpf       ? ['CPF', pac.cpf]                                                   : null,
+    pac.indication? ['Como chegou', pac.indication]                                    : null,
+  ].filter(Boolean);
+
+  el('pac-info-grid').innerHTML = infoItems.map(([label, value]) =>
+    `<div class="pac-info-item"><div class="pac-info-label">${label}</div><div class="pac-info-value">${esc(value)}</div></div>`
+  ).join('') + (pac.notes ? `<div class="pac-info-item pac-info-wide"><div class="pac-info-label">Observações</div><div class="pac-info-value">${esc(pac.notes)}</div></div>` : '');
+
   const tbody = el('tbody-historico');
   if (!stats.recs.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty-row">Nenhuma consulta registrada.</td></tr>';
@@ -630,8 +929,7 @@ function renderPacienteDetalhe(patientId) {
       <td>${statusBadge(r.status)}</td>
       <td>${nfBadge(r.invoiceStatus)}${r.invoiceNumber?` <span style="font-size:.75rem;color:var(--text-muted)">NF ${esc(r.invoiceNumber)}</span>`:''}</td>
       <td style="color:var(--text-muted);font-size:.8rem;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.notes||'')}</td>
-    </tr>
-  `).join('');
+    </tr>`).join('');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -660,7 +958,7 @@ el('search-rec').addEventListener('input', renderRecebimentos);
 
 function renderRecebimentos() {
   let recs = filteredRec();
-  const q = el('search-rec').value.toLowerCase();
+  const q  = el('search-rec').value.toLowerCase();
   if (q) recs = recs.filter(r => (r.patient||'').toLowerCase().includes(q));
 
   const total    = recs.reduce((s,r)=>s+(r.value||0),0);
@@ -696,15 +994,15 @@ function renderRecebimentos() {
 function openModalRec(rec = null) {
   S.editingRec = rec ? rec.id : null;
   setText('modal-rec-title', rec ? 'Editar Recebimento' : 'Novo Recebimento');
-  el('rec-id').value         = rec ? rec.id : '';
-  el('rec-data').value       = rec ? rec.date : today();
-  el('rec-paciente').value   = rec ? (rec.patient || '') : '';
-  el('rec-paciente-id').value= rec ? (rec.patientId || '') : '';
-  el('rec-tipo').value       = rec ? (rec.consultationType || '') : '';
-  el('rec-valor').value      = rec ? (rec.value || '') : '';
-  el('rec-status').value     = rec ? (rec.status || '') : '';
-  el('rec-nf').value         = rec ? (rec.invoiceStatus || 'pendente') : 'pendente';
-  el('rec-obs').value        = rec ? (rec.notes || '') : '';
+  el('rec-id').value          = rec ? rec.id : '';
+  el('rec-data').value        = rec ? rec.date : today();
+  el('rec-paciente').value    = rec ? (rec.patient || '') : '';
+  el('rec-paciente-id').value = rec ? (rec.patientId || '') : '';
+  el('rec-tipo').value        = rec ? (rec.consultationType || '') : '';
+  el('rec-valor').value       = rec ? (rec.value || '') : '';
+  el('rec-status').value      = rec ? (rec.status || '') : '';
+  el('rec-nf').value          = rec ? (rec.invoiceStatus || 'pendente') : 'pendente';
+  el('rec-obs').value         = rec ? (rec.notes || '') : '';
   openModal('modal-rec');
 }
 
@@ -731,7 +1029,7 @@ el('search-desp').addEventListener('input', renderDespesas);
 
 function renderDespesas() {
   let desps = filteredDesp();
-  const q = el('search-desp').value.toLowerCase();
+  const q   = el('search-desp').value.toLowerCase();
   if (q) desps = desps.filter(d => (d.description||'').toLowerCase().includes(q));
   const total = desps.reduce((s,d)=>s+(d.value||0),0);
   el('summary-desp').innerHTML = `${desps.length} reg. &nbsp;|&nbsp; Total: <strong>${fmtBRL(total)}</strong>`;
@@ -780,7 +1078,7 @@ function renderInadimplencia() {
     sumEl.classList.add('hidden');
   }
 
-  const tbody = el('tbody-inadimplencia');
+  const tbody  = el('tbody-inadimplencia');
   if (!pendentes.length) { tbody.innerHTML='<tr><td colspan="6" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>'; return; }
 
   const today_ = today();
@@ -825,6 +1123,7 @@ el('form-rapido').addEventListener('submit', async (e) => {
 });
 
 el('btn-nova-nota').addEventListener('click', () => openModalNota());
+el('btn-mark-all-nf').addEventListener('click', markAllPastNFsEmitted);
 
 el('form-nota').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -881,8 +1180,7 @@ function renderNFPendentes() {
         <div class="nf-item-value">${fmtBRL(r.value||0)}</div>
         <button class="btn btn-sm btn-primary" data-id="${r.id}" data-action="mark-nf">Emitida</button>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 function renderNotas() {
@@ -895,11 +1193,10 @@ function renderNotas() {
         <span>${n.createdAt ? fmtTimestamp(n.createdAt) : ''}</span>
         <div class="nota-actions">
           <button class="btn btn-sm btn-outline" data-id="${n.id}" data-action="edit-nota">Editar</button>
-          <button class="btn btn-sm btn-danger" data-id="${n.id}" data-action="del-nota">Excluir</button>
+          <button class="btn btn-sm btn-danger"  data-id="${n.id}" data-action="del-nota">Excluir</button>
         </div>
       </div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
 function openModalNota(nota = null) {
@@ -924,7 +1221,7 @@ function renderDRE() {
   });
   const totalRec = Object.values(recByType).reduce((s,v)=>s+v,0);
 
-  const catOrder = ['aluguel','iclinic','secretaria','contador','material','impostos','outros'];
+  const catOrder  = ['aluguel','iclinic','secretaria','contador','material','impostos','outros'];
   const despByCat = Object.fromEntries(catOrder.map(c=>[c,0]));
   desps.forEach(d => { despByCat[d.category] = (despByCat[d.category]||0)+(d.value||0); });
   const totalDesp = Object.values(despByCat).reduce((s,v)=>s+v,0);
@@ -1011,9 +1308,9 @@ function handleFileSelection(files) {
   for (const file of files) {
     const reader = new FileReader();
     reader.onload = e => {
-      const text    = e.target.result;
-      const header  = text.split('\n')[0] || '';
-      const type    = detectCSVType(header);
+      const text   = e.target.result;
+      const header = text.split('\n')[0] || '';
+      const type   = detectCSVType(header);
       if (type && !S.importFiles[type]) {
         S.importFiles[type] = { file, text };
         detected.push({ name: file.name, type });
@@ -1027,23 +1324,22 @@ function handleFileSelection(files) {
 }
 
 function detectCSVType(header) {
-  if (header.includes('patient_id') && header.includes('birthdate')) return 'patient';
-  if (header.includes('Paciente') && header.includes('Pago?'))        return 'bill';
-  if (header.includes('procedure_pack') && header.includes('schedule_id')) return 'event';
+  if (header.includes('patient_id') && header.includes('birthdate'))         return 'patient';
+  if (header.includes('Paciente')   && header.includes('Pago?'))             return 'bill';
+  if (header.includes('procedure_pack') && header.includes('schedule_id'))   return 'event';
   return null;
 }
 
 function renderFilesPreview(detected) {
-  const preview = el('import-files-preview');
-  const icons = { patient:'👤', bill:'💰', event:'📅' };
+  const preview    = el('import-files-preview');
+  const icons      = { patient:'👤', bill:'💰', event:'📅' };
   const typeLabels = { patient:'Pacientes', bill:'Financeiro', event:'Agendamentos' };
   preview.innerHTML = detected.map(f => `
     <div class="import-file-row">
       <span class="import-file-icon">${icons[f.type]||'📄'}</span>
       <span class="import-file-name">${esc(f.name)}</span>
       <span class="import-file-type ${f.type?'detected':'unknown'}">${f.type?typeLabels[f.type]:'Não reconhecido'}</span>
-    </div>
-  `).join('');
+    </div>`).join('');
   preview.classList.remove('hidden');
   el('import-actions-bar').classList.remove('hidden');
   el('import-result').classList.add('hidden');
@@ -1066,26 +1362,25 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, billsAdded:0, billsUpdated:0, errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, billsAdded:0, billsUpdated:0, eventsAdded:0, eventsUpdated:0, recFromEvents:0, errors:0 };
 
   try {
-    // ── 1. Build event lookup: patientId_date → description ──────────────
-    const eventMap = {};
+    // ── 1. Pre-parse events → build eventMap for teleconsulta detection ────────
+    let eventRows = [];
+    const eventMap = {};  // icPatId_date → { description, procedurePack, status }
     if (evtFile) {
-      const rows = parseCSV(evtFile.text);
-      rows.forEach(r => {
+      eventRows = parseCSV(evtFile.text);
+      eventRows.forEach(r => {
         const pid  = r.patient_id || '';
-        const date = r.date || '';
-        const desc = (r.description || '').toLowerCase();
-        if (pid && date) eventMap[`${pid}_${date}`] = desc;
+        const date = parseBRDate(r.date || '') || (r.date || '');
+        if (pid && date) eventMap[`${pid}_${date}`] = { description: r.description||'', procedurePack: r.procedure_pack||'', status: r.status||'' };
       });
     }
-    setProgress(15, 'Agendamentos processados…');
+    setProgress(10, 'Eventos mapeados…');
 
-    // ── 2. Upsert patients ────────────────────────────────────────────────
+    // ── 2. Upsert patients ─────────────────────────────────────────────────────
     if (patFile) {
       const rows = parseCSV(patFile.text);
-      // Build lookup of existing patients by iclinicPatientId
       const existing = {};
       S.data.patients.forEach(p => { if (p.iclinicPatientId) existing[p.iclinicPatientId] = p.id; });
 
@@ -1094,19 +1389,31 @@ async function runImport() {
         const icId = r.patient_id;
         if (!icId || !r.name) { i++; continue; }
 
-        const phone   = r.mobile_phone || r.home_phone || '';
-        const nameParts = (r.name || '').trim().split(' ');
+        const fullName  = capitalizeName((r.name || '').trim());
+        const nameParts = fullName.split(' ');
+        const phone     = (r.mobile_phone || '').trim();
+        const phone2    = (r.home_phone   || '').trim();
+
+        const rawGender = (r.gender || '').toLowerCase();
+        const gender    = rawGender.startsWith('f') ? 'f' : rawGender.startsWith('m') ? 'm' : rawGender ? 'o' : '';
+
+        const indication = [r.indication, r.indication_observation].filter(v => v && v.trim()).join(' — ').trim();
+
         const data = {
-          name:            (r.name||'').trim(),
-          firstName:       nameParts[0] || '',
-          lastName:        nameParts.slice(1).join(' ') || '',
-          phone:           phone.trim(),
-          email:           (r.email||'').trim(),
-          birthDate:       r.birthdate || '',
-          status:          r.active === 'True' ? 'ativo' : 'inativo',
-          notes:           (r.observation||'').trim(),
-          iclinicPatientId:icId,
-          iclinicPk:       r.pk || '',
+          name:             fullName,
+          firstName:        nameParts[0] || '',
+          lastName:         nameParts.slice(1).join(' ') || '',
+          phone,
+          phone2,
+          email:            (r.email || '').trim(),
+          cpf:              (r.cpf   || '').trim(),
+          gender,
+          birthDate:        r.birthdate || '',
+          status:           r.active === 'True' ? 'ativo' : 'inativo',
+          notes:            (r.observation || '').trim(),
+          indication,
+          iclinicPatientId: icId,
+          iclinicPk:        r.pk || '',
         };
 
         if (existing[icId]) {
@@ -1117,25 +1424,28 @@ async function runImport() {
           results.patientsAdded++;
         }
         i++;
-        if (i % 10 === 0) setProgress(15 + Math.round(i/rows.length*35), `Pacientes: ${i}/${rows.length}…`);
+        if (i % 10 === 0) setProgress(10 + Math.round(i/rows.length*25), `Pacientes: ${i}/${rows.length}…`);
       }
     }
     await reloadCollection('patients');
-    setProgress(50, 'Pacientes importados…');
+    setProgress(35, 'Pacientes importados…');
 
-    // ── 3. Build patient pk → iclinicPatientId map (for event lookup) ────
+    // ── 3. Build patient id maps ───────────────────────────────────────────────
     const pkToPatientId = {};
+    const icIdToDocId   = {};
+    const icIdToName    = {};
     S.data.patients.forEach(p => {
       if (p.iclinicPk && p.iclinicPatientId) pkToPatientId[p.iclinicPk] = p.iclinicPatientId;
+      if (p.iclinicPatientId) {
+        icIdToDocId[p.iclinicPatientId] = p.id;
+        icIdToName[p.iclinicPatientId]  = p.name;
+      }
     });
-    // Also map firestore id by iclinicPatientId
-    const icIdToDocId = {};
-    S.data.patients.forEach(p => { if (p.iclinicPatientId) icIdToDocId[p.iclinicPatientId] = p.id; });
 
-    // ── 4. Upsert bills ───────────────────────────────────────────────────
+    // ── 4. Upsert bills + build billCoveredSet ─────────────────────────────────
+    const billCoveredSet = new Set();
     if (billFile) {
       const rows = parseCSV(billFile.text);
-      // Build lookup of existing recebimentos by iclinicBillId
       const existingBills = {};
       S.data.recebimentos.forEach(r => { if (r.iclinicBillId) existingBills[r.iclinicBillId] = r; });
 
@@ -1143,48 +1453,49 @@ async function runImport() {
       for (const r of rows) {
         const billId = r.id;
         if (!billId) { i++; continue; }
-        // Only import revenue lines
         if ((r['Tipo']||'').toLowerCase() !== 'receita') { i++; continue; }
 
-        const rawDate   = r['Data'] || '';
-        const date      = parseBRDate(rawDate);
+        const date = parseBRDate(r['Data'] || '');
         if (!date) { i++; continue; }
 
-        const patName   = (r['Paciente']||'').trim();
-        const pkPac     = r['PK Paciente'] || '';
-        const icPatId   = pkToPatientId[pkPac] || '';
-        const patDocId  = icIdToDocId[icPatId] || null;
+        const patName  = (r['Paciente'] || '').trim();
+        const pkPac    = r['PK Paciente'] || '';
+        const icPatId  = pkToPatientId[pkPac] || '';
+        const patDocId = icIdToDocId[icPatId] || null;
 
-        // Detect teleconsulta via event lookup
-        const eventKey  = `${icPatId}_${date}`;
-        const eventDesc = eventMap[eventKey] || '';
-        const isTele    = eventDesc.includes('online') || eventDesc.includes('tele');
-        const consType  = isTele ? 'teleconsulta' : 'presencial';
+        // Detect teleconsulta via eventMap
+        const evtKey  = `${icPatId}_${date}`;
+        const evtData = eventMap[evtKey] || {};
+        const isTele  = (evtData.description||'').toLowerCase().includes('online') ||
+                        (evtData.description||'').toLowerCase().includes('tele') ||
+                        (evtData.procedurePack||'').toLowerCase().includes('online');
+        const consType = isTele ? 'teleconsulta' : 'presencial';
 
-        const rawVal = (r['Valor']||'0').replace(',','.');
-        const value  = parseFloat(rawVal) || 0;
+        const value  = parseBRNumber(r['Valor'] || '0');
         const paid   = (r['Pago?']||'').toLowerCase() === 'sim';
         const status = value === 0 ? 'gratuito' : (paid ? 'pix' : 'pendente');
 
+        if (icPatId) billCoveredSet.add(`${icPatId}_${date}`);
+
         const newData = {
           date,
-          patient:         patName,
-          patientId:       patDocId,
-          consultationType:consType,
+          patient:          capitalizeName(patName),
+          patientId:        patDocId,
+          consultationType: consType,
           value,
           status,
-          iclinicBillId:   billId,
-          iclinicPatientPk:pkPac,
+          iclinicBillId:    billId,
+          iclinicPatientPk: pkPac,
+          iclinicPatientId: icPatId,
         };
 
         if (existingBills[billId]) {
-          // Update financial fields, preserve user-entered NF/invoice data
           const ex = existingBills[billId];
           await updateDoc(doc(db, 'recebimentos', ex.id), {
             ...newData,
-            invoiceStatus:  ex.invoiceStatus  || 'pendente',
-            invoiceNumber:  ex.invoiceNumber  || '',
-            notes:          ex.notes          || '',
+            invoiceStatus: ex.invoiceStatus || 'pendente',
+            invoiceNumber: ex.invoiceNumber || '',
+            notes:         ex.notes         || '',
             updatedAt: serverTimestamp(),
           });
           results.billsUpdated++;
@@ -1200,11 +1511,88 @@ async function runImport() {
           results.billsAdded++;
         }
         i++;
-        if (i % 20 === 0) setProgress(50 + Math.round(i/rows.length*45), `Financeiro: ${i}/${rows.length}…`);
+        if (i % 20 === 0) setProgress(35 + Math.round(i/rows.length*30), `Financeiro: ${i}/${rows.length}…`);
+      }
+    }
+    await reloadCollection('recebimentos');
+    setProgress(65, 'Financeiro importado…');
+
+    // ── 5. Upsert consultations + recebimentos from 2024+ events ──────────────
+    if (evtFile && eventRows.length) {
+      const existingConsult  = {};
+      S.data.consultations.forEach(c => { if (c.iclinicEventId) existingConsult[c.iclinicEventId] = c; });
+
+      const existingEventRec = {};
+      S.data.recebimentos.forEach(r => { if (r.iclinicEventId) existingEventRec[r.iclinicEventId] = r; });
+
+      const completedStatuses = new Set(['cp', 'at', 'co']);
+
+      let i = 0;
+      for (const r of eventRows) {
+        const eventId = r.pk;
+        if (!eventId) { i++; continue; }
+
+        const icPatId  = r.patient_id || '';
+        const patDocId = icIdToDocId[icPatId] || null;
+        const patName  = icIdToName[icPatId]  || '';
+        const date     = parseBRDate(r.date || '') || '';
+        if (!date) { i++; continue; }
+
+        const status = (r.status || '').toLowerCase().trim();
+        const { value, payStatus, isTele } = extractEventData(r.description, r.procedure_pack);
+        const consType = isTele ? 'teleconsulta' : 'presencial';
+
+        // Upsert consultation (ALL events → calendar)
+        const consultData = {
+          date,
+          patientId:        patDocId,
+          patientName:      patName,
+          iclinicPatientId: icPatId,
+          status,
+          value,
+          consultationType: consType,
+          iclinicEventId:   eventId,
+          notes:            r.description || '',
+        };
+
+        if (existingConsult[eventId]) {
+          await updateDoc(doc(db, 'consultations', existingConsult[eventId].id), { ...consultData, updatedAt: serverTimestamp() });
+          results.eventsUpdated++;
+        } else {
+          await addDoc(collection(db, 'consultations'), { ...consultData, createdAt: serverTimestamp() });
+          results.eventsAdded++;
+        }
+
+        // For 2024+ completed events not covered by bill: create recebimento
+        const year = parseInt(date.split('-')[0]);
+        if (year >= 2024 && completedStatuses.has(status) && !billCoveredSet.has(`${icPatId}_${date}`) && !existingEventRec[eventId]) {
+          const evtPayStatus = value === 0 ? 'gratuito' : payStatus;
+          await addDoc(collection(db, 'recebimentos'), {
+            date,
+            patient:          patName,
+            patientId:        patDocId,
+            consultationType: consType,
+            value,
+            status:           evtPayStatus,
+            invoiceStatus:    evtPayStatus === 'gratuito' ? 'isenta' : 'pendente',
+            invoiceNumber:    '',
+            notes:            r.description || '',
+            iclinicEventId:   eventId,
+            iclinicPatientId: icPatId,
+            createdAt:        serverTimestamp(),
+            createdBy:        S.user.uid,
+          });
+          results.recFromEvents++;
+          billCoveredSet.add(`${icPatId}_${date}`);
+        }
+
+        i++;
+        if (i % 20 === 0) setProgress(65 + Math.round(i/eventRows.length*30), `Agendamentos: ${i}/${eventRows.length}…`);
       }
     }
 
     await reloadCollection('recebimentos');
+    await reloadCollection('consultations');
     updateBadges();
     setProgress(100, 'Concluído!');
 
@@ -1213,9 +1601,11 @@ async function runImport() {
     res.innerHTML = `
       <strong>✓ Importação concluída!</strong><br><br>
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados<br>
-      💰 Recebimentos: <strong>${results.billsAdded} adicionados</strong>, ${results.billsUpdated} atualizados<br>
-      ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors>1?'s':''} ignorada${results.errors>1?'s':''} (dados inválidos).` : ''}
-      <br><br>Os dados estão disponíveis em <strong>Pacientes</strong> e <strong>Recebimentos</strong>.
+      💰 Recebimentos (financeiro): <strong>${results.billsAdded} adicionados</strong>, ${results.billsUpdated} atualizados<br>
+      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados<br>
+      ${results.recFromEvents ? `<strong>✨ ${results.recFromEvents} recebimento${results.recFromEvents > 1 ? 's' : ''} criado${results.recFromEvents > 1 ? 's' : ''} via agenda 2024+</strong><br>` : ''}
+      ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
+      <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Recebimentos</strong> e <strong>Agenda</strong>.
     `;
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');
@@ -1267,6 +1657,15 @@ function parseBRDate(str) {
   return '';
 }
 
+function parseBRNumber(str) {
+  if (!str) return 0;
+  const s = String(str).trim();
+  const cleaned = s.includes(',')
+    ? s.replace(/\./g, '').replace(',', '.')
+    : s;
+  return parseFloat(cleaned) || 0;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTOCOMPLETE
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1291,8 +1690,7 @@ function setupAutocomplete(inputId, listId, hiddenId) {
         <div class="autocomplete-item" data-id="${p.id}" data-name="${esc(p.name||'')}">
           <div class="autocomplete-item-name">${esc(p.name||'')}</div>
           <div class="autocomplete-item-meta">${p.phone||p.email||''}</div>
-        </div>
-      `).join('');
+        </div>`).join('');
     }
     list.classList.remove('hidden');
   });
@@ -1327,11 +1725,9 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // DELEGATED EVENTS
 // ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener('click', (e) => {
-  // Patient name links
   const plink = e.target.closest('[data-patient]');
   if (plink) { navigateToPatient(plink.dataset.patient); return; }
 
-  // Alert link
   const alink = e.target.closest('.alert-link[data-view]');
   if (alink) { e.preventDefault(); navigateTo(alink.dataset.view); return; }
 
@@ -1350,6 +1746,8 @@ document.addEventListener('click', (e) => {
   else if (action === 'edit-pac')       { const p = S.data.patients.find(p=>p.id===id); if(p) openModalPaciente(p); }
   else if (action === 'del-pac')        { deletePatient(id); }
   else if (action === 'view-pac')       { navigateToPatient(id); }
+  else if (action === 'cal-select-day') { selectCalendarDay(btn.dataset.date); }
+  else if (action === 'merge-pac')      { mergePacientes(btn.dataset.keep, btn.dataset.drop); }
 });
 
 el('sidebar-toggle').addEventListener('click', () => el('sidebar').classList.toggle('collapsed'));
@@ -1367,7 +1765,47 @@ function fmtDate(d)         { if(!d)return'—'; const[y,m,dy]=d.split('-'); ret
 function fmtTimestamp(ts)   { try{return ts.toDate().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return''} }
 function daysBetween(d1,d2) { return Math.max(0,Math.round((new Date(d2)-new Date(d1))/86400000)); }
 function sumWhere(arr,pred) { return arr.filter(pred).reduce((s,r)=>s+(r.value||0),0); }
-function calcAge(dateStr)   { if(!dateStr)return null; const b=new Date(dateStr+'T12:00'); const today_=new Date(); let age=today_.getFullYear()-b.getFullYear(); if(today_.getMonth()<b.getMonth()||(today_.getMonth()===b.getMonth()&&today_.getDate()<b.getDate()))age--; return age; }
+function calcAge(dateStr)   { if(!dateStr)return null; const b=new Date(dateStr+'T12:00'); const t=new Date(); let age=t.getFullYear()-b.getFullYear(); if(t.getMonth()<b.getMonth()||(t.getMonth()===b.getMonth()&&t.getDate()<b.getDate()))age--; return age; }
+
+function capitalizeName(str) {
+  if (!str) return '';
+  const particles = new Set(['de','da','do','dos','das','di','del','e','em','a','o','os','as','von','van','el','la','los','las','du','des']);
+  return str.trim().split(/\s+/).map((word, i) => {
+    if (!word) return word;
+    const lower = word.toLowerCase();
+    if (i > 0 && particles.has(lower)) return lower;
+    return lower.charAt(0).toUpperCase() + lower.slice(1);
+  }).join(' ');
+}
+
+function extractEventData(description, procedurePack) {
+  let value     = 0;
+  let payStatus = 'pendente';
+  let isTele    = false;
+
+  const desc = (description || '').toLowerCase();
+  isTele = desc.includes('online') || desc.includes('teleconsult');
+
+  // Extract value from description: "Pago pix (500)" or "Pago pix (450,00)"
+  const descValMatch = (description || '').match(/\((\d+(?:[,\.]\d+)?)\)/);
+  if (descValMatch) {
+    value = parseBRNumber(descValMatch[1]);
+  }
+
+  // Detect payment from description
+  if (desc.includes('pago') || desc.includes('pix') || desc.includes('receb')) {
+    payStatus = 'pix';
+  }
+
+  // If no value from description, try procedure_pack: "Consulta 600,00" or "Consulta 600"
+  if (!value && procedurePack) {
+    const ppMatch = procedurePack.match(/[Cc]onsulta\s*([\d.,]+)/);
+    if (ppMatch) value = parseBRNumber(ppMatch[1]);
+    if (!isTele && procedurePack.toLowerCase().includes('online')) isTele = true;
+  }
+
+  return { value, payStatus, isTele };
+}
 
 function statusBadge(status) {
   const cls = {pix:'badge-pix',pendente:'badge-pendente',gratuito:'badge-gratuito'};

@@ -62,6 +62,10 @@
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
           <span class="nav-label">Pacientes</span>
         </a>
+        <a class="nav-item" data-view="agenda" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clip-rule="evenodd"/></svg>
+          <span class="nav-label">Agenda</span>
+        </a>
         <a class="nav-item" data-view="recebimentos" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"/></svg>
           <span class="nav-label">Recebimentos</span>
@@ -186,6 +190,13 @@
           <h2 class="view-title">Pacientes</h2>
           <button class="btn btn-primary" id="btn-novo-paciente">+ Novo Paciente</button>
         </div>
+        <div class="dup-section hidden" id="dup-section">
+          <div class="dup-section-header">
+            <svg viewBox="0 0 20 20" fill="currentColor" width="18"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+            <span id="dup-title">Possíveis duplicatas detectadas</span>
+          </div>
+          <div class="dup-groups" id="dup-groups"></div>
+        </div>
         <div class="card table-card">
           <div class="table-toolbar">
             <input type="text" class="search-input" id="search-pac" placeholder="Buscar por nome…">
@@ -238,6 +249,44 @@
               </tbody>
             </table>
           </div>
+        </div>
+      </section>
+
+      <!-- ── AGENDA ──────────────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-agenda">
+        <div class="view-header">
+          <h2 class="view-title">Agenda</h2>
+          <div class="calendar-nav">
+            <button class="btn btn-outline btn-sm" id="btn-cal-prev">← Anterior</button>
+            <span class="cal-month-label" id="cal-month-label">—</span>
+            <button class="btn btn-outline btn-sm" id="btn-cal-next">Próximo →</button>
+          </div>
+        </div>
+        <div class="card calendar-card">
+          <div class="calendar-header-row">
+            <div class="cal-day-header">Dom</div>
+            <div class="cal-day-header">Seg</div>
+            <div class="cal-day-header">Ter</div>
+            <div class="cal-day-header">Qua</div>
+            <div class="cal-day-header">Qui</div>
+            <div class="cal-day-header">Sex</div>
+            <div class="cal-day-header">Sáb</div>
+          </div>
+          <div class="calendar-body" id="calendar-body"></div>
+          <div class="cal-legend">
+            <div class="cal-legend-item"><div class="cal-legend-dot cal-status-cp"></div>Compareceu/Atendido</div>
+            <div class="cal-legend-item"><div class="cal-legend-dot cal-status-co"></div>Confirmado online</div>
+            <div class="cal-legend-item"><div class="cal-legend-dot cal-status-sc"></div>Agendado</div>
+            <div class="cal-legend-item"><div class="cal-legend-dot cal-status-re"></div>Remarcado</div>
+            <div class="cal-legend-item"><div class="cal-legend-dot cal-status-na"></div>Não compareceu</div>
+          </div>
+        </div>
+        <div class="card calendar-detail hidden" id="calendar-detail">
+          <div class="card-header">
+            <h3 id="cal-detail-title">Consultas do dia</h3>
+            <button class="modal-close-btn" id="btn-cal-close-detail">✕</button>
+          </div>
+          <div id="cal-detail-list"></div>
         </div>
       </section>
 
@@ -332,8 +381,11 @@
           <!-- NFs Pendentes -->
           <div class="card sec-card">
             <div class="card-header">
-              <h3>Notas Fiscais Pendentes</h3>
-              <span class="badge-pill" id="nf-count-pill">0</span>
+              <div style="display:flex;align-items:center;gap:10px">
+                <h3>Notas Fiscais Pendentes</h3>
+                <span class="badge-pill" id="nf-count-pill">0</span>
+              </div>
+              <button class="btn btn-sm btn-outline nav-medica-only" id="btn-mark-all-nf" style="font-size:.75rem">Marcar todas emitidas</button>
             </div>
             <div class="nf-actions">
               <a href="https://www.nfse.gov.br/EmissorNacional/Login" target="_blank" rel="noopener" class="nf-link-btn">
@@ -664,6 +716,31 @@
               <option value="inativo">Inativo</option>
               <option value="alta">Alta</option>
             </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pac-telefone2">Telefone 2</label>
+            <input type="tel" id="pac-telefone2" placeholder="(11) 99999-9999">
+          </div>
+          <div class="form-group">
+            <label for="pac-cpf">CPF</label>
+            <input type="text" id="pac-cpf" placeholder="000.000.000-00">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pac-sexo">Sexo</label>
+            <select id="pac-sexo">
+              <option value="">Não informado</option>
+              <option value="f">Feminino</option>
+              <option value="m">Masculino</option>
+              <option value="o">Outro</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="pac-indicacao">Como chegou</label>
+            <input type="text" id="pac-indicacao" placeholder="Ex: Indicação, Google, Instagram…">
           </div>
         </div>
         <div class="form-group">
