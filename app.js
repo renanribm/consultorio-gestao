@@ -1651,9 +1651,13 @@ async function runImport() {
 
         if (existingBills[billId]) {
           const ex = existingBills[billId];
+          // Never downgrade: if already paid/NF emitida (set by secretária or manually), keep it
+          const safeStatus      = ex.status      === 'pix'     ? 'pix'     : status;
+          const safeInvStatus   = ex.invoiceStatus === 'emitida' ? 'emitida' : (ex.invoiceStatus || 'pendente');
           await updateDoc(doc(db, 'recebimentos', ex.id), {
             ...newData,
-            invoiceStatus: ex.invoiceStatus || 'pendente',
+            status:        safeStatus,
+            invoiceStatus: safeInvStatus,
             invoiceNumber: ex.invoiceNumber || '',
             notes:         ex.notes         || '',
             updatedAt: serverTimestamp(),
