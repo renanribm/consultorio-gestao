@@ -33,6 +33,8 @@ const S = {
   editingPaciente: null,
   currentPatient:  null,
   importFiles:     { patient: null, bill: null, event: null },
+  nfSelected:      new Set(),
+  inadimSelected:  new Set(),
   calendarYear:    new Date().getFullYear(),
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
@@ -1085,6 +1087,10 @@ function renderInadimplencia() {
     .filter(r => r.status === 'pendente')
     .sort((a,b) => a.date.localeCompare(b.date));
 
+  // Clean stale selections
+  const pendIds = new Set(pendentes.map(r => r.id));
+  S.inadimSelected.forEach(id => { if (!pendIds.has(id)) S.inadimSelected.delete(id); });
+
   const sumEl = el('inadimplencia-summary');
   if (pendentes.length) {
     const total = pendentes.reduce((s,r)=>s+(r.value||0),0);
@@ -1094,17 +1100,28 @@ function renderInadimplencia() {
     sumEl.classList.add('hidden');
   }
 
-  const tbody  = el('tbody-inadimplencia');
-  if (!pendentes.length) { tbody.innerHTML='<tr><td colspan="6" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>'; return; }
+  const bulkBar = el('inadim-bulk-bar');
+  const tbody   = el('tbody-inadimplencia');
+
+  if (!pendentes.length) {
+    if (bulkBar) bulkBar.classList.add('hidden');
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>';
+    return;
+  }
+
+  if (bulkBar) bulkBar.classList.remove('hidden');
+  updateInadimToolbar();
 
   const today_ = today();
   tbody.innerHTML = pendentes.map(r => {
+    const sel     = S.inadimSelected.has(r.id);
     const dias    = daysBetween(r.date, today_);
     const daysCls = dias <= 7 ? 'days-ok' : dias <= 30 ? 'days-warning' : 'days-danger';
     const patCell = r.patientId
       ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>`
       : esc(r.patient||'—');
-    return `<tr>
+    return `<tr class="${sel ? 'row-selected' : ''}">
+      <td style="padding:10px 8px"><input type="checkbox" class="row-check inadim-check" data-id="${r.id}" ${sel ? 'checked' : ''}></td>
       <td>${fmtDate(r.date)}</td>
       <td>${patCell}</td>
       <td><span class="type-tag">${labels.consultationType[r.consultationType]||r.consultationType||'—'}</span></td>
@@ -1113,6 +1130,19 @@ function renderInadimplencia() {
       <td><button class="btn-received" data-id="${r.id}" data-action="mark-received">✓ Marcar Recebido</button></td>
     </tr>`;
   }).join('');
+}
+
+function updateInadimToolbar() {
+  const pendentes = S.data.recebimentos.filter(r => r.status === 'pendente');
+  const total = pendentes.length, selCount = S.inadimSelected.size;
+  const allCheck = el('check-inadim-all');
+  if (allCheck) {
+    allCheck.checked = selCount > 0 && selCount === total;
+    allCheck.indeterminate = selCount > 0 && selCount < total;
+  }
+  setText('inadim-sel-count', selCount > 0 ? `${selCount} selecionado${selCount !== 1 ? 's' : ''}` : '');
+  const btn = el('btn-inadim-bulk-received');
+  if (btn) btn.disabled = selCount === 0;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1139,7 +1169,64 @@ el('form-rapido').addEventListener('submit', async (e) => {
 });
 
 el('btn-nova-nota').addEventListener('click', () => openModalNota());
-el('btn-mark-all-nf').addEventListener('click', markAllPastNFsEmitted);
+
+// NF bulk selection
+el('check-nf-all').addEventListener('change', (e) => {
+  const pendNF = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
+  if (e.target.checked) pendNF.forEach(r => S.nfSelected.add(r.id));
+  else S.nfSelected.clear();
+  renderNFPendentes();
+});
+
+el('btn-nf-bulk-emit').addEventListener('click', async () => {
+  if (!S.nfSelected.size) return;
+  const ids   = [...S.nfSelected];
+  const count = ids.length;
+  if (!confirm(`Marcar ${count} nota${count > 1 ? 's fiscais' : ' fiscal'} como emitida${count > 1 ? 's' : ''}?`)) return;
+  showLoading();
+  try {
+    for (let i = 0; i < ids.length; i += 400) {
+      const batch = writeBatch(db);
+      ids.slice(i, i + 400).forEach(id =>
+        batch.update(doc(db, 'recebimentos', id), { invoiceStatus: 'emitida', updatedAt: serverTimestamp() })
+      );
+      await batch.commit();
+    }
+    S.nfSelected.clear();
+    await reloadCollection('recebimentos');
+    updateBadges(); renderView(S.view);
+    showToast(`${count} NF${count > 1 ? 's marcadas' : ' marcada'} como emitida${count > 1 ? 's' : ''}!`, 'success');
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
+});
+
+// Inadimplência bulk selection
+el('check-inadim-all').addEventListener('change', (e) => {
+  const pendentes = S.data.recebimentos.filter(r => r.status === 'pendente');
+  if (e.target.checked) pendentes.forEach(r => S.inadimSelected.add(r.id));
+  else S.inadimSelected.clear();
+  renderInadimplencia();
+});
+
+el('btn-inadim-bulk-received').addEventListener('click', async () => {
+  if (!S.inadimSelected.size) return;
+  const ids   = [...S.inadimSelected];
+  const count = ids.length;
+  if (!confirm(`Marcar ${count} pagamento${count > 1 ? 's' : ''} como recebido${count > 1 ? 's' : ''} via PIX?`)) return;
+  showLoading();
+  try {
+    for (let i = 0; i < ids.length; i += 400) {
+      const batch = writeBatch(db);
+      ids.slice(i, i + 400).forEach(id =>
+        batch.update(doc(db, 'recebimentos', id), { status: 'pix', updatedAt: serverTimestamp() })
+      );
+      await batch.commit();
+    }
+    S.inadimSelected.clear();
+    await reloadCollection('recebimentos');
+    updateBadges(); renderView(S.view);
+    showToast(`${count} pagamento${count > 1 ? 's marcados' : ' marcado'} como recebido${count > 1 ? 's' : ''}!`, 'success');
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
+});
 
 el('form-nota').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1183,11 +1270,27 @@ function renderNFPendentes() {
 
   el('nf-count-pill').textContent = pendNF.length;
 
-  const nfList = el('nf-list');
-  if (!pendNF.length) { nfList.innerHTML='<div class="empty-state">Nenhuma NF pendente de emissão.</div>'; return; }
+  // Remove stale selections
+  const pendIds = new Set(pendNF.map(r => r.id));
+  S.nfSelected.forEach(id => { if (!pendIds.has(id)) S.nfSelected.delete(id); });
 
-  nfList.innerHTML = pendNF.map(r => `
-    <div class="nf-item">
+  const toolbar = el('nf-bulk-toolbar');
+  const nfList  = el('nf-list');
+
+  if (!pendNF.length) {
+    toolbar.classList.add('hidden');
+    nfList.innerHTML = '<div class="empty-state">Nenhuma NF pendente de emissão.</div>';
+    return;
+  }
+  toolbar.classList.remove('hidden');
+  updateNFToolbar();
+
+  nfList.innerHTML = pendNF.map(r => {
+    const sel = S.nfSelected.has(r.id);
+    return `<div class="nf-item${sel ? ' nf-selected' : ''}">
+      <label class="nf-item-check" onclick="event.stopPropagation()">
+        <input type="checkbox" class="row-check nf-check" data-id="${r.id}" ${sel ? 'checked' : ''}>
+      </label>
       <div class="nf-item-left">
         <div class="nf-item-name">${esc(r.patient||'—')}</div>
         <div class="nf-item-meta">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}</div>
@@ -1196,7 +1299,22 @@ function renderNFPendentes() {
         <div class="nf-item-value">${fmtBRL(r.value||0)}</div>
         <button class="btn btn-sm btn-primary" data-id="${r.id}" data-action="mark-nf">Emitida</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
+}
+
+function updateNFToolbar() {
+  const pendNF   = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
+  const total    = pendNF.length;
+  const selCount = S.nfSelected.size;
+  const allCheck = el('check-nf-all');
+  if (allCheck) {
+    allCheck.checked       = selCount > 0 && selCount === total;
+    allCheck.indeterminate = selCount > 0 && selCount < total;
+  }
+  setText('nf-sel-count', selCount > 0 ? `${selCount} selecionada${selCount !== 1 ? 's' : ''}` : '');
+  const btn = el('btn-nf-bulk-emit');
+  if (btn) btn.disabled = selCount === 0;
 }
 
 function renderNotas() {
@@ -1767,6 +1885,22 @@ document.addEventListener('click', (e) => {
 });
 
 el('sidebar-toggle').addEventListener('click', () => el('sidebar').classList.toggle('collapsed'));
+
+// Per-row checkbox changes (delegated — rows are dynamically rendered)
+document.addEventListener('change', (e) => {
+  if (e.target.classList.contains('nf-check')) {
+    const id = e.target.dataset.id;
+    e.target.checked ? S.nfSelected.add(id) : S.nfSelected.delete(id);
+    e.target.closest('.nf-item')?.classList.toggle('nf-selected', e.target.checked);
+    updateNFToolbar();
+  }
+  if (e.target.classList.contains('inadim-check')) {
+    const id = e.target.dataset.id;
+    e.target.checked ? S.inadimSelected.add(id) : S.inadimSelected.delete(id);
+    e.target.closest('tr')?.classList.toggle('row-selected', e.target.checked);
+    updateInadimToolbar();
+  }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UTILITIES
