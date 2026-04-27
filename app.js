@@ -1024,7 +1024,7 @@ function renderRecebimentos() {
       <td>${patCell}</td>
       <td><span class="type-tag">${labels.consultationType[r.consultationType]||r.consultationType||'—'}</span></td>
       <td class="text-right value-cell">${fmtBRL(r.value||0)}</td>
-      <td>${statusBadge(r.status)}</td>
+      <td>${statusBadge(r.status)}${r.consolidated ? ' <span title="Consolidado pela secretária" style="font-size:.7rem;opacity:.6">🔒</span>' : ''}</td>
       <td>${nfInfo}</td>
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:.78rem">${esc(r.notes||'')}</td>
       <td><div class="action-btns">
@@ -1651,17 +1651,26 @@ async function runImport() {
 
         if (existingBills[billId]) {
           const ex = existingBills[billId];
-          // Never downgrade: if already paid/NF emitida (set by secretária or manually), keep it
-          const safeStatus      = ex.status      === 'pix'     ? 'pix'     : status;
-          const safeInvStatus   = ex.invoiceStatus === 'emitida' ? 'emitida' : (ex.invoiceStatus || 'pendente');
-          await updateDoc(doc(db, 'recebimentos', ex.id), {
-            ...newData,
-            status:        safeStatus,
-            invoiceStatus: safeInvStatus,
-            invoiceNumber: ex.invoiceNumber || '',
-            notes:         ex.notes         || '',
-            updatedAt: serverTimestamp(),
-          });
+          if (ex.consolidated) {
+            // Consolidated records: iClinic only updates clinical/scheduling fields, never payment fields
+            await updateDoc(doc(db, 'recebimentos', ex.id), {
+              date, patient: capitalizeName(patName), patientId: patDocId,
+              consultationType: consType,
+              iclinicBillId: billId, iclinicPatientPk: pkPac, iclinicPatientId: icPatId,
+              updatedAt: serverTimestamp(),
+            });
+          } else {
+            const safeStatus    = ex.status       === 'pix'     ? 'pix'     : status;
+            const safeInvStatus = ex.invoiceStatus === 'emitida' ? 'emitida' : (ex.invoiceStatus || 'pendente');
+            await updateDoc(doc(db, 'recebimentos', ex.id), {
+              ...newData,
+              status:        safeStatus,
+              invoiceStatus: safeInvStatus,
+              invoiceNumber: ex.invoiceNumber || '',
+              notes:         ex.notes         || '',
+              updatedAt: serverTimestamp(),
+            });
+          }
           results.billsUpdated++;
         } else {
           await addDoc(collection(db, 'recebimentos'), {
@@ -1688,6 +1697,11 @@ async function runImport() {
 
       const existingEventRec = {};
       S.data.recebimentos.forEach(r => { if (r.iclinicEventId) existingEventRec[r.iclinicEventId] = r; });
+
+      // Protect consolidated records: add them to billCoveredSet so event import never creates duplicates
+      S.data.recebimentos.forEach(r => {
+        if (r.consolidated && r.iclinicPatientId && r.date) billCoveredSet.add(`${r.iclinicPatientId}_${r.date}`);
+      });
 
       const completedStatuses = new Set(['cp', 'at', 'co']);
 
@@ -1968,7 +1982,7 @@ async function runSecretariaImport() {
       }
 
       if (existing) {
-        const updates = { consultationType: consType, value, status, invoiceStatus: invStatus, updatedAt: serverTimestamp() };
+        const updates = { consultationType: consType, value, status, invoiceStatus: invStatus, consolidated: true, updatedAt: serverTimestamp() };
         if (paymentDate) updates.paymentDate = paymentDate;
         if (obs && !existing.notes) updates.notes = obs;
         await updateDoc(doc(db, 'recebimentos', existing.id), updates);
@@ -1985,6 +1999,7 @@ async function runSecretariaImport() {
           invoiceStatus: invStatus, invoiceNumber: '',
           notes: obs,
           source: 'secretaria',
+          consolidated: true,
           createdAt: serverTimestamp(), createdBy: S.user.uid,
         };
         if (paymentDate) newRec.paymentDate = paymentDate;
