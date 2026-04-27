@@ -1446,6 +1446,50 @@ function renderDRECharts(recByType, despByCat, catOrder) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ── RESET COMPLETO ────────────────────────────────────────────────────────────
+el('btn-reset-all').addEventListener('click', async () => {
+  const phrase = 'APAGAR TUDO';
+  const typed  = window.prompt(`Esta ação é irreversível.\n\nDigite exatamente: ${phrase}`);
+  if (typed !== phrase) { showToast('Cancelado.', 'info'); return; }
+  if (!confirm('Última confirmação: apagar TODOS os dados permanentemente?')) return;
+
+  el('btn-reset-all').disabled = true;
+  el('btn-reset-all').textContent = 'Apagando…';
+
+  try {
+    const cols = ['recebimentos', 'despesas', 'notas', 'patients', 'consultations'];
+    let total = 0;
+
+    for (const col of cols) {
+      const snap = await getDocs(collection(db, col));
+      // Firestore batch limit = 500
+      const ids = snap.docs.map(d => d.id);
+      for (let i = 0; i < ids.length; i += 490) {
+        const b = writeBatch(db);
+        ids.slice(i, i + 490).forEach(id => b.delete(doc(db, col, id)));
+        await b.commit();
+        total += Math.min(490, ids.length - i);
+      }
+    }
+
+    // Reset local state
+    S.data = { recebimentos: [], despesas: [], notas: [], patients: [], consultations: [] };
+    renderView(S.view);
+    updateBadges();
+
+    const res = el('reset-result');
+    res.className = 'import-result success';
+    res.innerHTML = `<strong>✓ ${total} registros apagados.</strong> O sistema está limpo — pode importar os dados do zero.`;
+    res.classList.remove('hidden');
+    showToast('Todos os dados foram apagados.', 'success');
+  } catch (err) {
+    handleErr(err);
+  } finally {
+    el('btn-reset-all').disabled = false;
+    el('btn-reset-all').textContent = 'Apagar todos os dados';
+  }
+});
+
 // IMPORTAÇÃO iCLINIC — 3 CSVs, upsert inteligente
 // ─────────────────────────────────────────────────────────────────────────────
 const csvInput   = el('csv-input');
