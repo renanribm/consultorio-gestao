@@ -677,9 +677,15 @@ function renderAgenda() {
       .sort((a, b) => statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status));
 
     const chips = events.slice(0, 3).map(e => {
-      const st  = e.status || 'sc';
-      const nm  = (e.patientName || '?').split(' ')[0];
-      return `<div class="cal-chip cal-chip-${st}" title="${esc(e.patientName || '')} — ${st}">${esc(nm)}</div>`;
+      const isBlock  = !e.iclinicPatientId && !e.patientId;
+      const chipCls  = isBlock ? 'cal-chip-block' : `cal-chip-${e.status || 'sc'}`;
+      const chipText = isBlock
+        ? (e.notes || 'Bloqueio').split(/\s+/).slice(0, 2).join(' ')
+        : ((e.patientName || '').split(' ')[0] || '?');
+      const chipTitle = isBlock
+        ? (e.notes || 'Bloqueio pessoal')
+        : `${e.patientName || '?'} — ${e.status || ''}`;
+      return `<div class="cal-chip ${chipCls}" title="${esc(chipTitle)}">${esc(chipText)}</div>`;
     }).join('');
     const more = events.length > 3 ? `<div class="cal-chip cal-chip-more">+${events.length - 3}</div>` : '';
 
@@ -731,17 +737,27 @@ function renderCalendarDetail(dateStr) {
   el('cal-detail-list').innerHTML = events.length === 0
     ? '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>'
     : events.map(e => {
-        const nameEl = e.patientId
-          ? `<span class="patient-link" data-patient="${e.patientId}">${esc(e.patientName || '—')}</span>`
-          : esc(e.patientName || '—');
+        const isBlock   = !e.iclinicPatientId && !e.patientId;
+        const dotCls    = isBlock ? 'cal-status-block' : `cal-status-${e.status || 'sc'}`;
+        const statusTxt = isBlock ? 'Uso pessoal / Bloqueio' : (statusLabels[e.status] || e.status || '—');
+        const nameEl    = isBlock
+          ? `<span style="color:var(--text-muted);font-style:italic">${esc(e.notes || 'Bloqueio pessoal')}</span>`
+          : e.patientId
+            ? `<span class="patient-link" data-patient="${e.patientId}">${esc(e.patientName || '—')}</span>`
+            : esc(e.patientName || '—');
+        const subLine   = isBlock
+          ? ''
+          : `<div style="font-size:.75rem;color:var(--text-muted)">${statusTxt} · ${labels.consultationType[e.consultationType] || e.consultationType || '—'}</div>`;
+        const notesLine = (!isBlock && e.notes)
+          ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>`
+          : '';
         return `<div class="cal-detail-item">
-          <div class="cal-detail-dot cal-status-${e.status || 'sc'}"></div>
+          <div class="cal-detail-dot ${dotCls}"></div>
           <div style="flex:1;min-width:0">
             <div style="font-weight:600;color:var(--text)">${nameEl}</div>
-            <div style="font-size:.75rem;color:var(--text-muted)">${statusLabels[e.status] || e.status || '—'} · ${labels.consultationType[e.consultationType] || e.consultationType || '—'}</div>
-            ${e.notes ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>` : ''}
+            ${subLine}${notesLine}
           </div>
-          <div style="text-align:right;flex-shrink:0;font-weight:700;color:var(--text)">${e.value ? fmtBRL(e.value) : '—'}</div>
+          <div style="text-align:right;flex-shrink:0;font-weight:700;color:var(--text)">${(!isBlock && e.value) ? fmtBRL(e.value) : ''}</div>
         </div>`;
       }).join('');
 
@@ -1563,9 +1579,9 @@ async function runImport() {
           results.eventsAdded++;
         }
 
-        // For 2024+ completed events not covered by bill: create recebimento
+        // For 2024+ completed events not covered by bill: create recebimento (skip personal blocks)
         const year = parseInt(date.split('-')[0]);
-        if (year >= 2024 && completedStatuses.has(status) && !billCoveredSet.has(`${icPatId}_${date}`) && !existingEventRec[eventId]) {
+        if (icPatId && year >= 2024 && completedStatuses.has(status) && !billCoveredSet.has(`${icPatId}_${date}`) && !existingEventRec[eventId]) {
           const evtPayStatus = value === 0 ? 'gratuito' : payStatus;
           await addDoc(collection(db, 'recebimentos'), {
             date,
