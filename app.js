@@ -35,6 +35,7 @@ const S = {
   importFiles:     { patient: null, bill: null, event: null },
   nfSelected:      new Set(),
   inadimSelected:  new Set(),
+  pacSort:         { col: 'name', dir: 'asc' },
   calendarYear:    new Date().getFullYear(),
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
@@ -802,24 +803,50 @@ el('btn-edit-pac-atual').addEventListener('click', () => {
 
 el('search-pac').addEventListener('input', renderPacientes);
 
+document.querySelector('#view-pacientes thead').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th) return;
+  const col = th.dataset.sort;
+  if (S.pacSort.col === col) S.pacSort.dir = S.pacSort.dir === 'asc' ? 'desc' : 'asc';
+  else { S.pacSort.col = col; S.pacSort.dir = 'asc'; }
+  renderPacientes();
+});
+
 function renderPacientes() {
   renderDuplicatesSection();
 
-  let pats = [...S.data.patients];
-  const q  = el('search-pac').value.toLowerCase();
-  if (q) pats = pats.filter(p => (p.name||'').toLowerCase().includes(q));
+  const q = el('search-pac').value.toLowerCase();
+  let rows = S.data.patients
+    .filter(p => !q || (p.name||'').toLowerCase().includes(q))
+    .map(p => ({ p, stats: getPatientStats(p.id, p.name) }));
 
-  el('summary-pac').innerHTML = `${pats.length} paciente${pats.length!==1?'s':''}`;
+  const { col, dir } = S.pacSort;
+  const mult = dir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    switch (col) {
+      case 'name':      return mult * (a.p.name||'').localeCompare(b.p.name||'', 'pt-BR', { sensitivity: 'base' });
+      case 'consultas': return mult * (a.stats.totalConsultas - b.stats.totalConsultas);
+      case 'lastVisit': return mult * ((a.stats.lastVisit||'').localeCompare(b.stats.lastVisit||''));
+      case 'totalPago': return mult * (a.stats.totalPago - b.stats.totalPago);
+      default:          return 0;
+    }
+  });
+
+  el('summary-pac').innerHTML = `${rows.length} paciente${rows.length!==1?'s':''}`;
+
+  // Update sort arrows
+  document.querySelectorAll('#view-pacientes thead th[data-sort]').forEach(th => {
+    if (th.dataset.sort === col) th.setAttribute('data-dir', dir);
+    else th.removeAttribute('data-dir');
+  });
 
   const tbody = el('tbody-pac');
-  if (!pats.length) {
+  if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="8" class="empty-row">Nenhum paciente encontrado.</td></tr>';
     return;
   }
 
-  tbody.innerHTML = pats.map(p => {
-    const stats = getPatientStats(p.id, p.name);
-    return `<tr>
+  tbody.innerHTML = rows.map(({ p, stats }) => `<tr>
       <td><span class="patient-link" data-patient="${p.id}">${esc(p.name||'—')}</span></td>
       <td>${esc(p.phone||'—')}</td>
       <td>${stats.totalConsultas}</td>
@@ -831,8 +858,7 @@ function renderPacientes() {
         <button class="btn-edit" data-id="${p.id}" data-action="edit-pac">Editar</button>
         ${S.role==='medica'?`<button class="btn-del" data-id="${p.id}" data-action="del-pac">Excluir</button>`:''}
       </div></td>
-    </tr>`;
-  }).join('');
+    </tr>`).join('');
 }
 
 function openModalPaciente(pac = null) {
