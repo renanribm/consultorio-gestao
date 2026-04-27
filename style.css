@@ -543,12 +543,6 @@ input[type="checkbox"].row-check {
 .nf-item.nf-selected  { background: var(--primary-pale); }
 .nf-item-check        { display: flex; align-items: center; padding-right: 2px; flex-shrink: 0; }
 .data-table tbody tr.row-selected td { background: var(--primary-pale); }
-.inadim-bulk-bar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 20px; background: var(--primary-faint);
-  border-bottom: 1px solid var(--border);
-}
-.inadim-bulk-count { font-size: .82rem; font-weight: 700; color: var(--primary); min-width: 130px; }
 
 /* ============================================================
    DUPLICATE DETECTION

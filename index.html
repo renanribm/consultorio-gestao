@@ -357,15 +357,19 @@
         </div>
         <div class="inadimplencia-summary hidden" id="inadimplencia-summary"></div>
         <div class="card table-card">
-          <div class="inadim-bulk-bar hidden" id="inadim-bulk-bar">
-            <span class="inadim-bulk-count" id="inadim-sel-count"></span>
-            <button class="btn btn-sm btn-primary" id="btn-inadim-bulk-received" disabled>✓ Marcar como recebidos</button>
+          <div class="bulk-toolbar hidden" id="inadim-bulk-bar">
+            <label class="bulk-check-label">
+              <input type="checkbox" id="check-inadim-all" class="row-check">
+              <span>Selecionar todos</span>
+            </label>
+            <span class="bulk-count" id="inadim-sel-count"></span>
+            <button class="btn btn-sm btn-primary" id="btn-inadim-bulk-received" style="margin-left:auto" disabled>✓ Marcar como recebidos</button>
           </div>
           <div class="table-wrap">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width:36px;padding:10px 8px"><input type="checkbox" id="check-inadim-all" class="row-check"></th>
+                  <th style="width:36px"></th>
                   <th>Data</th><th>Paciente</th><th>Tipo</th>
                   <th class="text-right">Valor</th><th>Dias em Aberto</th><th>Ações</th>
                 </tr>
