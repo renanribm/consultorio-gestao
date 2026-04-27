@@ -1,34 +1,20 @@
 // ================================================================
-// FIREBASE CONFIGURATION — substitua os valores abaixo pelas
-// credenciais reais do seu projeto Firebase.
-//
-// Como obter:
-//   1. Acesse https://console.firebase.google.com/
-//   2. Selecione (ou crie) seu projeto
-//   3. Clique no ícone de engrenagem → Configurações do projeto
-//   4. Role até "Seus aplicativos" → selecione ou crie um app Web
-//   5. Copie os valores do objeto firebaseConfig
+// FIREBASE CONFIGURATION
 // ================================================================
-
 export const firebaseConfig = {
-  apiKey: "AIzaSyBx-uqRrLZU1jd8pISABPRC7Qob87uqz2o",
-  authDomain: "consultorio-dra-thuani.firebaseapp.com",
-  projectId: "consultorio-dra-thuani",
-  storageBucket: "consultorio-dra-thuani.firebasestorage.app",
+  apiKey:            "AIzaSyBx-uqRrLZU1jd8pISABPRC7Qob87uqz2o",
+  authDomain:        "consultorio-dra-thuani.firebaseapp.com",
+  projectId:         "consultorio-dra-thuani",
+  storageBucket:     "consultorio-dra-thuani.firebasestorage.app",
   messagingSenderId: "390572380657",
-  appId: "1:390572380657:web:0517aa86ec14cd2a01f450"
+  appId:             "1:390572380657:web:0517aa86ec14cd2a01f450"
 };
 
 // ================================================================
 // PAPÉIS DOS USUÁRIOS
-// Mapeie cada e-mail ao papel correspondente.
-//   'medica'     → acesso total (todas as telas + exclusão)
-//   'secretaria' → acesso operacional (sem DRE, sem exclusão)
-//
-// Substitua os e-mails pelos endereços reais das usuárias.
 // ================================================================
 export const userRoles = {
-  "thuanicampanha@gmail.com":      "medica",
+  "thuanicampanha@gmail.com":               "medica",
   "secretariadrathuanicampanha@gmail.com":  "secretaria"
 };
 
@@ -37,10 +23,8 @@ export const userRoles = {
 // ================================================================
 export const labels = {
   consultationType: {
-    primeira:    "Primeira Consulta",
-    retorno:     "Retorno",
-    teleconsulta:"Teleconsulta",
-    atestado:    "Atestado"
+    presencial:   "Presencial",
+    teleconsulta: "Teleconsulta"
   },
   status: {
     pix:      "Recebido PIX",
@@ -68,5 +52,15 @@ export const labels = {
   role: {
     medica:     "Médica",
     secretaria: "Secretária"
+  },
+  patientStatus: {
+    ativo:  "Ativo",
+    inativo:"Inativo",
+    alta:   "Alta"
+  },
+  gender: {
+    m: "Masculino",
+    f: "Feminino",
+    o: "Outro"
   }
 };

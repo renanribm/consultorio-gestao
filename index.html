@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gestão Financeira — Consultório</title>
+  <title>Consultório Dra. Thuani Campanha</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -17,8 +17,8 @@
     <div class="login-card">
       <div class="login-brand">
         <div class="login-logo-mark">✦</div>
-        <h1 class="login-title">Consultório</h1>
-        <p class="login-subtitle">Gestão Financeira</p>
+        <h1 class="login-title">Dra. Thuani Campanha</h1>
+        <p class="login-subtitle">Gestão Financeira do Consultório</p>
       </div>
       <form id="login-form" autocomplete="on">
         <div class="form-group">
@@ -30,7 +30,9 @@
           <input type="password" id="login-password" name="password" autocomplete="current-password" required placeholder="••••••••">
         </div>
         <div id="login-error" class="login-error hidden"></div>
-        <button type="submit" class="btn btn-primary btn-full" id="btn-login">Entrar</button>
+        <div class="login-btn-wrap">
+          <button type="submit" class="btn btn-primary btn-full" id="btn-login">Entrar</button>
+        </div>
       </form>
     </div>
   </div>
@@ -44,7 +46,7 @@
         <div class="sidebar-brand">
           <span class="sidebar-logo-mark">✦</span>
           <div class="sidebar-brand-text">
-            <div class="sidebar-brand-name">Consultório</div>
+            <div class="sidebar-brand-name">Dra. Thuani Campanha</div>
             <div class="sidebar-brand-sub">Gestão Financeira</div>
           </div>
         </div>
@@ -55,6 +57,10 @@
         <a class="nav-item active" data-view="dashboard" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V4zM3 12a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H4a1 1 0 01-1-1v-4zm6 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
           <span class="nav-label">Dashboard</span>
+        </a>
+        <a class="nav-item" data-view="pacientes" href="#">
+          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+          <span class="nav-label">Pacientes</span>
         </a>
         <a class="nav-item" data-view="recebimentos" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-8.707l-3-3a1 1 0 00-1.414 0l-3 3a1 1 0 001.414 1.414L9 9.414V13a1 1 0 102 0V9.414l1.293 1.293a1 1 0 001.414-1.414z" clip-rule="evenodd"/></svg>
@@ -80,7 +86,7 @@
         </a>
         <a class="nav-item nav-medica-only hidden" data-view="import" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-          <span class="nav-label">Importar CSV</span>
+          <span class="nav-label">Importar iClinic</span>
         </a>
       </nav>
 
@@ -126,7 +132,6 @@
           <h2 class="view-title">Dashboard</h2>
           <span class="view-period" id="dash-period"></span>
         </div>
-
         <div class="kpi-grid">
           <div class="kpi-card kpi-green">
             <div class="kpi-label">Receita Recebida</div>
@@ -159,12 +164,10 @@
             <div class="kpi-meta">consultas pagas</div>
           </div>
         </div>
-
         <div class="alert-nf hidden" id="alert-nf">
           <svg viewBox="0 0 20 20" fill="currentColor" width="20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
           <span><strong id="alert-nf-count">0 notas fiscais</strong> pendentes de emissão. &nbsp;<a href="#" data-view="secretaria" class="alert-link">Ver no painel →</a></span>
         </div>
-
         <div class="dashboard-grid">
           <div class="card chart-card">
             <div class="card-header"><h3>Evolução Mensal (6 meses)</h3></div>
@@ -172,9 +175,68 @@
           </div>
           <div class="card">
             <div class="card-header"><h3>Últimos Lançamentos</h3></div>
-            <div class="recent-list" id="recent-list">
-              <div class="empty-state">Nenhum lançamento.</div>
-            </div>
+            <div class="recent-list" id="recent-list"><div class="empty-state">Nenhum lançamento.</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PACIENTES ─────────────────────────────────────────────────── -->
+      <section class="view hidden" id="view-pacientes">
+        <div class="view-header">
+          <h2 class="view-title">Pacientes</h2>
+          <button class="btn btn-primary" id="btn-novo-paciente">+ Novo Paciente</button>
+        </div>
+        <div class="card table-card">
+          <div class="table-toolbar">
+            <input type="text" class="search-input" id="search-pac" placeholder="Buscar por nome…">
+            <div class="table-summary" id="summary-pac"></div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Nome</th><th>Telefone</th><th>Consultas</th>
+                  <th>Última Visita</th><th class="text-right">Total Pago</th>
+                  <th class="text-right">Pendente</th><th>Status</th><th>Ações</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-pac">
+                <tr><td colspan="8" class="empty-row">Nenhum paciente cadastrado.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── PACIENTE DETALHE ──────────────────────────────────────────── -->
+      <section class="view hidden" id="view-paciente-detalhe">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <button class="btn btn-outline btn-sm" id="btn-back-pac">← Pacientes</button>
+            <h2 class="view-title" id="det-nome">—</h2>
+            <span id="det-status-badge"></span>
+          </div>
+          <button class="btn btn-outline btn-sm" id="btn-edit-pac-atual">Editar Paciente</button>
+        </div>
+        <div class="kpi-grid" id="pac-kpis"></div>
+        <div class="card patient-info-card">
+          <div class="card-header"><h3>Informações do Paciente</h3></div>
+          <div class="patient-info-grid" id="pac-info-grid"></div>
+        </div>
+        <div class="card table-card">
+          <div class="card-header"><h3>Histórico de Consultas</h3></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th><th>Tipo</th><th class="text-right">Valor</th>
+                  <th>Status</th><th>Nota Fiscal</th><th>Obs.</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-historico">
+                <tr><td colspan="6" class="empty-row">Nenhuma consulta registrada.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
@@ -182,7 +244,10 @@
       <!-- ── RECEBIMENTOS ──────────────────────────────────────────────── -->
       <section class="view hidden" id="view-recebimentos">
         <div class="view-header">
-          <h2 class="view-title">Recebimentos</h2>
+          <div>
+            <h2 class="view-title">Recebimentos</h2>
+            <p class="view-subtitle">Todas as consultas e valores recebidos ou a receber</p>
+          </div>
           <button class="btn btn-primary" id="btn-novo-rec">+ Novo Recebimento</button>
         </div>
         <div class="card table-card">
@@ -285,10 +350,15 @@
             </div>
           </div>
 
-          <!-- Lançamento Rápido -->
+          <!-- Consulta do Dia -->
           <div class="card sec-card">
-            <div class="card-header"><h3>Lançamento Rápido</h3></div>
-            <form id="form-rapido" autocomplete="off">
+            <div class="card-header">
+              <div>
+                <h3>Consulta do Dia</h3>
+                <p class="card-subtitle">Registro rápido para consultas de hoje</p>
+              </div>
+            </div>
+            <form id="form-rapido" autocomplete="off" class="sec-form">
               <div class="form-row">
                 <div class="form-group">
                   <label for="r-data">Data</label>
@@ -296,17 +366,19 @@
                 </div>
                 <div class="form-group">
                   <label for="r-paciente">Paciente</label>
-                  <input type="text" id="r-paciente" required placeholder="Nome do paciente">
+                  <div class="autocomplete-wrap">
+                    <input type="text" id="r-paciente" required placeholder="Buscar paciente…" autocomplete="off">
+                    <input type="hidden" id="r-paciente-id">
+                    <div class="autocomplete-list hidden" id="r-paciente-list"></div>
+                  </div>
                 </div>
               </div>
               <div class="form-row">
                 <div class="form-group">
-                  <label for="r-tipo">Tipo</label>
+                  <label for="r-tipo">Modalidade</label>
                   <select id="r-tipo">
-                    <option value="primeira">Primeira Consulta</option>
-                    <option value="retorno" selected>Retorno</option>
+                    <option value="presencial" selected>Presencial</option>
                     <option value="teleconsulta">Teleconsulta</option>
-                    <option value="atestado">Atestado</option>
                   </select>
                 </div>
                 <div class="form-group">
@@ -332,7 +404,9 @@
                   </select>
                 </div>
               </div>
-              <button type="submit" class="btn btn-primary btn-full">Salvar Lançamento</button>
+              <div class="form-action-wrap">
+                <button type="submit" class="btn btn-primary btn-full">Registrar Consulta</button>
+              </div>
             </form>
           </div>
 
@@ -360,9 +434,7 @@
           <div class="card dre-table-card">
             <div class="table-wrap">
               <table class="dre-table" id="dre-table">
-                <thead>
-                  <tr><th>Descrição</th><th class="text-right">Valor (R$)</th><th class="text-right">%</th></tr>
-                </thead>
+                <thead><tr><th>Descrição</th><th class="text-right">Valor (R$)</th><th class="text-right">%</th></tr></thead>
                 <tbody id="tbody-dre"></tbody>
               </table>
             </div>
@@ -380,40 +452,43 @@
         </div>
       </section>
 
-      <!-- ── IMPORTAR CSV ──────────────────────────────────────────────── -->
+      <!-- ── IMPORTAR iCLINIC ──────────────────────────────────────────── -->
       <section class="view hidden" id="view-import">
         <div class="view-header">
-          <h2 class="view-title">Importar CSV — iClinic</h2>
+          <h2 class="view-title">Importar dados do iClinic</h2>
         </div>
         <div class="card import-card">
           <div class="import-instructions">
-            <h3>Como importar</h3>
+            <h3>Como exportar do iClinic</h3>
             <ol>
-              <li>No iClinic, exporte o relatório de atendimentos em formato CSV.</li>
-              <li>Faça o upload do arquivo abaixo.</li>
-              <li>Mapeie as colunas do CSV para os campos do sistema.</li>
-              <li>Revise a pré-visualização e confirme a importação.</li>
+              <li>No iClinic, vá em <strong>Relatórios → Exportar dados</strong></li>
+              <li>Selecione o período e exporte os 3 arquivos: <strong>Pacientes</strong>, <strong>Financeiro (bill)</strong> e <strong>Agendamentos (event_scheduling)</strong></li>
+              <li>Selecione os 3 arquivos abaixo de uma vez</li>
+              <li>Clique em <strong>Importar / Atualizar</strong> — registros já existentes serão atualizados, sem duplicatas</li>
             </ol>
-            <p class="import-note">Separadores aceitos: vírgula <code>,</code> ou ponto-e-vírgula <code>;</code>. A primeira linha deve conter os cabeçalhos.</p>
+            <p class="import-note">Pode rodar quantas vezes quiser. O sistema detecta automaticamente cada arquivo pelo conteúdo.</p>
           </div>
 
           <label class="upload-area" id="upload-area">
-            <input type="file" id="csv-input" accept=".csv,.txt" class="hidden">
+            <input type="file" id="csv-input" accept=".csv" multiple class="hidden">
             <div class="upload-icon">📂</div>
-            <div class="upload-text">Clique para selecionar o arquivo CSV</div>
-            <div class="upload-sub">ou arraste e solte aqui</div>
+            <div class="upload-text">Clique para selecionar os arquivos CSV do iClinic</div>
+            <div class="upload-sub">Selecione os 3 arquivos de uma vez (patient · bill · event_scheduling)</div>
           </label>
 
-          <div class="import-mapping hidden" id="import-mapping">
-            <h3>Mapeamento de Colunas</h3>
-            <p class="import-note">Selecione qual coluna do seu CSV corresponde a cada campo:</p>
-            <div class="mapping-grid" id="mapping-grid"></div>
-            <h4 style="margin:20px 0 10px">Pré-visualização (5 primeiras linhas)</h4>
-            <div class="table-wrap"><table class="data-table" id="import-preview-table"></table></div>
-            <div class="import-actions">
-              <button class="btn btn-outline" id="btn-cancel-import">Cancelar</button>
-              <button class="btn btn-primary" id="btn-confirm-import">Importar Registros</button>
-            </div>
+          <div class="import-files-preview hidden" id="import-files-preview"></div>
+
+          <div class="import-actions-bar hidden" id="import-actions-bar">
+            <button class="btn btn-outline" id="btn-cancel-import">Cancelar</button>
+            <button class="btn btn-primary" id="btn-run-import">
+              <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              Importar / Atualizar Dados
+            </button>
+          </div>
+
+          <div class="import-progress hidden" id="import-progress">
+            <div class="import-progress-bar"><div id="import-progress-fill"></div></div>
+            <div id="import-progress-label">Processando…</div>
           </div>
 
           <div class="import-result hidden" id="import-result"></div>
@@ -427,7 +502,10 @@
   <div class="modal-overlay hidden" id="modal-rec">
     <div class="modal">
       <div class="modal-header">
-        <h3 id="modal-rec-title">Novo Recebimento</h3>
+        <div>
+          <h3 id="modal-rec-title">Novo Recebimento</h3>
+          <p class="modal-subtitle">Formulário completo — use para lançamentos avulsos ou correções</p>
+        </div>
         <button class="modal-close-btn" data-close="modal-rec">✕</button>
       </div>
       <form id="form-rec" autocomplete="off">
@@ -439,18 +517,20 @@
           </div>
           <div class="form-group">
             <label for="rec-paciente">Paciente *</label>
-            <input type="text" id="rec-paciente" required placeholder="Nome completo">
+            <div class="autocomplete-wrap">
+              <input type="text" id="rec-paciente" required placeholder="Buscar paciente…" autocomplete="off">
+              <input type="hidden" id="rec-paciente-id">
+              <div class="autocomplete-list hidden" id="rec-paciente-list"></div>
+            </div>
           </div>
         </div>
         <div class="form-row">
           <div class="form-group">
-            <label for="rec-tipo">Tipo de Consulta *</label>
+            <label for="rec-tipo">Modalidade *</label>
             <select id="rec-tipo" required>
               <option value="">Selecione…</option>
-              <option value="primeira">Primeira Consulta</option>
-              <option value="retorno">Retorno</option>
+              <option value="presencial">Presencial</option>
               <option value="teleconsulta">Teleconsulta</option>
-              <option value="atestado">Atestado</option>
             </select>
           </div>
           <div class="form-group">
@@ -543,6 +623,61 @@
     </div>
   </div>
 
+  <!-- ══ MODAL: PACIENTE ═══════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-pac">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modal-pac-title">Novo Paciente</h3>
+        <button class="modal-close-btn" data-close="modal-pac">✕</button>
+      </div>
+      <form id="form-pac" autocomplete="off">
+        <input type="hidden" id="pac-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pac-nome">Nome *</label>
+            <input type="text" id="pac-nome" required placeholder="Primeiro nome">
+          </div>
+          <div class="form-group">
+            <label for="pac-sobrenome">Sobrenome *</label>
+            <input type="text" id="pac-sobrenome" required placeholder="Sobrenome">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pac-telefone">Telefone</label>
+            <input type="tel" id="pac-telefone" placeholder="(11) 99999-9999">
+          </div>
+          <div class="form-group">
+            <label for="pac-email">E-mail</label>
+            <input type="email" id="pac-email" placeholder="email@exemplo.com">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="pac-nascimento">Data de Nascimento</label>
+            <input type="date" id="pac-nascimento">
+          </div>
+          <div class="form-group">
+            <label for="pac-status">Status</label>
+            <select id="pac-status">
+              <option value="ativo">Ativo</option>
+              <option value="inativo">Inativo</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="pac-obs">Observações</label>
+          <textarea id="pac-obs" rows="3" placeholder="Notas internas sobre o paciente…"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="modal-pac">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ══ MODAL: NOTA ═══════════════════════════════════════════════════════ -->
   <div class="modal-overlay hidden" id="modal-nota">
     <div class="modal modal-sm">
@@ -559,6 +694,31 @@
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" data-close="modal-nota">Cancelar</button>
           <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: NF EMITIDA ════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-nf">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <div>
+          <h3>Marcar Nota Fiscal como Emitida</h3>
+          <p class="modal-subtitle">Registre o número da NF para controle</p>
+        </div>
+        <button class="modal-close-btn" data-close="modal-nf">✕</button>
+      </div>
+      <form id="form-nf" autocomplete="off">
+        <input type="hidden" id="nf-rec-id">
+        <div class="form-group">
+          <label for="nf-numero">Número da Nota Fiscal</label>
+          <input type="text" id="nf-numero" placeholder="Ex: 000125">
+          <span class="field-hint">Opcional — pode preencher depois editando o recebimento.</span>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" data-close="modal-nf">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Confirmar Emissão</button>
         </div>
       </form>
     </div>
