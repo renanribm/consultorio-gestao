@@ -1659,7 +1659,7 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, errors:0 };
 
   try {
     // ── 1. Pre-parse events ────────────────────────────────────────────────────
@@ -1757,7 +1757,7 @@ async function runImport() {
         const patDocId = icIdToDocId[icPatId] || null;
         const patName  = icIdToName[icPatId]  || '';
         const date     = parseBRDate(r.date || '') || '';
-        if (!date) { i++; continue; }
+        if (!date || date < '2025-09-01') { results.eventsIgnored++; i++; continue; }
 
         const status = (r.status || '').toLowerCase().trim();
         const { value, isTele } = extractEventData(r.description, r.procedure_pack);
@@ -1798,7 +1798,7 @@ async function runImport() {
     res.innerHTML = `
       <strong>✓ Importação concluída!</strong><br><br>
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados${results.patientsSkipped ? `, ${results.patientsSkipped} com dados curados preservados` : ''}<br>
-      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados<br>
+      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
       <br><br>Dados disponíveis em <strong>Pacientes</strong> e <strong>Agenda</strong>.
     `;
