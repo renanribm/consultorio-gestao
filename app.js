@@ -91,7 +91,9 @@ el('btn-logout').addEventListener('click', () => signOut(auth));
 function applyRoleUI() {
   const isMedica = S.role === 'medica';
   document.querySelectorAll('.nav-medica-only').forEach(e => e.classList.toggle('hidden', !isMedica));
-  el('sidebar-avatar').textContent    = isMedica ? 'M' : 'S';
+  const initial = isMedica ? 'M' : 'S';
+  el('sidebar-avatar').textContent    = initial;
+  el('mobile-avatar').textContent     = initial;
   el('sidebar-user-name').textContent = S.user.email.split('@')[0];
   el('sidebar-user-role').textContent = labels.role[S.role];
   el('login-screen').classList.add('hidden');
@@ -117,8 +119,24 @@ document.querySelectorAll('[data-view]').forEach(link => {
   link.addEventListener('click', (e) => {
     e.preventDefault();
     navigateTo(link.dataset.view);
+    closeMobileDrawer();
   });
 });
+
+function openMobileDrawer() {
+  el('sidebar').classList.add('mobile-open');
+  el('sidebar-backdrop').classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+function closeMobileDrawer() {
+  el('sidebar').classList.remove('mobile-open');
+  el('sidebar-backdrop').classList.remove('active');
+  document.body.style.overflow = '';
+}
+el('btn-mobile-menu').addEventListener('click', () => {
+  el('sidebar').classList.contains('mobile-open') ? closeMobileDrawer() : openMobileDrawer();
+});
+el('sidebar-backdrop').addEventListener('click', closeMobileDrawer);
 
 function navigateTo(view) {
   if (S.role === 'secretaria' && (view === 'dre' || view === 'import')) {
