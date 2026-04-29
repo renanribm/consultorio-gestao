@@ -243,7 +243,8 @@ button { cursor: pointer; border: none; background: none; }
 /* ============================================================
    VIEWS
    ============================================================ */
-section.view { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+section.view { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; align-items: center; }
+section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .view-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
 .view-title { font-size: 1.5rem; color: var(--text); }
 .view-subtitle { font-size: .82rem; color: var(--text-muted); margin-top: 3px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 400; }
