@@ -39,6 +39,7 @@ const S = {
   calendarYear:    new Date().getFullYear(),
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
+  retornoSort:     'asc',
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ function navigateTo(view) {
   const target = el('view-' + view);
   if (target) target.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
-  el('filter-bar').classList.toggle('hidden', ['import','paciente-detalhe','agenda'].includes(view));
+  el('filter-bar').classList.toggle('hidden', ['import','paciente-detalhe','agenda','pacientes'].includes(view));
   renderView(view);
 }
 
@@ -187,7 +188,8 @@ function applyPreset(preset) {
   const pad = n => String(n).padStart(2,'0');
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   let start, end;
-  if      (preset === 'mes')       { start = ymd(new Date(now.getFullYear(), now.getMonth(), 1));    end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
+  if      (preset === 'semana')    { const dow = now.getDay(); start = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate()-dow)); end = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate()+(6-dow))); }
+  else if (preset === 'mes')       { start = ymd(new Date(now.getFullYear(), now.getMonth(), 1));    end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
   else if (preset === 'mespassado'){ start = ymd(new Date(now.getFullYear(), now.getMonth()-1, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth(), 0)); }
   else if (preset === '3meses')    { start = ymd(new Date(now.getFullYear(), now.getMonth()-2, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
   else if (preset === '6meses')    { start = ymd(new Date(now.getFullYear(), now.getMonth()-5, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
@@ -636,6 +638,8 @@ el('btn-cal-next').addEventListener('click', () => {
   if (S.calendarMonth > 11) { S.calendarMonth = 0; S.calendarYear++; }
   renderAgenda();
 });
+el('btn-cal-year-prev').addEventListener('click', () => { S.calendarYear--; renderAgenda(); });
+el('btn-cal-year-next').addEventListener('click', () => { S.calendarYear++; renderAgenda(); });
 el('btn-cal-close-detail').addEventListener('click', () => {
   S.calendarSelDay = null;
   el('calendar-detail').classList.add('hidden');
@@ -683,8 +687,8 @@ function renderAgenda() {
       const isBlock  = !e.iclinicPatientId && !e.patientId;
       const chipCls  = isBlock ? 'cal-chip-block' : `cal-chip-${e.status || 'sc'}`;
       const chipText = isBlock
-        ? (e.notes || 'Bloqueio').split(/\s+/).slice(0, 2).join(' ')
-        : ((e.patientName || '').split(' ')[0] || '?');
+        ? (e.notes || 'Bloqueio').substring(0, 22)
+        : (() => { const parts = (e.patientName || '?').split(' '); return parts.length > 1 ? `${parts[0]} ${parts[parts.length-1]}` : parts[0]; })();
       const chipTitle = isBlock
         ? (e.notes || 'Bloqueio pessoal')
         : `${e.patientName || '?'} — ${e.status || ''}`;
@@ -730,40 +734,68 @@ function selectCalendarDay(dateStr) {
 function renderCalendarDetail(dateStr) {
   const events = S.data.consultations
     .filter(c => c.date === dateStr)
-    .sort((a, b) => (a.patientName || '').localeCompare(b.patientName || ''));
+    .sort((a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99'));
 
   const [y, m, d] = dateStr.split('-');
-  setText('cal-detail-title', `${parseInt(d)}/${parseInt(m)}/${y} — ${events.length} consulta${events.length !== 1 ? 's' : ''}`);
+  const patientCount = events.filter(e => e.iclinicPatientId || e.patientId).length;
+  setText('cal-detail-title', `${parseInt(d)}/${parseInt(m)}/${y} — ${patientCount} consulta${patientCount !== 1 ? 's' : ''}`);
 
-  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado' };
+  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online' };
 
-  el('cal-detail-list').innerHTML = events.length === 0
-    ? '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>'
-    : events.map(e => {
-        const isBlock   = !e.iclinicPatientId && !e.patientId;
-        const dotCls    = isBlock ? 'cal-status-block' : `cal-status-${e.status || 'sc'}`;
-        const statusTxt = isBlock ? 'Uso pessoal / Bloqueio' : (statusLabels[e.status] || e.status || '—');
-        const nameEl    = isBlock
-          ? `<span style="color:var(--text-muted);font-style:italic">${esc(e.notes || 'Bloqueio pessoal')}</span>`
-          : e.patientId
-            ? `<span class="patient-link" data-patient="${e.patientId}">${esc(e.patientName || '—')}</span>`
-            : esc(e.patientName || '—');
-        const subLine   = isBlock
-          ? ''
-          : `<div style="font-size:.75rem;color:var(--text-muted)">${statusTxt} · ${labels.consultationType[e.consultationType] || e.consultationType || '—'}</div>`;
-        const notesLine = (!isBlock && e.notes)
-          ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>`
-          : '';
-        return `<div class="cal-detail-item">
-          <div class="cal-detail-dot ${dotCls}"></div>
-          <div style="flex:1;min-width:0">
-            <div style="font-weight:600;color:var(--text)">${nameEl}</div>
-            ${subLine}${notesLine}
-          </div>
-          <div style="text-align:right;flex-shrink:0;font-weight:700;color:var(--text)">${(!isBlock && e.value) ? fmtBRL(e.value) : ''}</div>
-        </div>`;
-      }).join('');
+  if (events.length === 0) {
+    el('cal-detail-list').innerHTML = '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>';
+    el('calendar-detail').classList.remove('hidden');
+    return;
+  }
 
+  const timeToMins = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const fmtTime    = t => t || '—:——';
+
+  const items = [];
+  for (let i = 0; i < events.length; i++) {
+    const e    = events[i];
+    const prev = events[i - 1];
+
+    // Janela entre eventos (gap >= 15 min)
+    if (prev && prev.endTime && e.startTime) {
+      const gapStart = timeToMins(prev.endTime);
+      const gapEnd   = timeToMins(e.startTime);
+      if (gapEnd - gapStart >= 15) {
+        items.push(`<div class="cal-detail-gap">
+          <span class="cal-detail-gap-time">${fmtTime(prev.endTime)} – ${fmtTime(e.startTime)}</span>
+          <span class="cal-detail-gap-label">Janela disponível (${gapEnd - gapStart} min)</span>
+        </div>`);
+      }
+    }
+
+    const isBlock   = !e.iclinicPatientId && !e.patientId;
+    const dotCls    = isBlock ? 'cal-status-block' : `cal-status-${e.status || 'sc'}`;
+    const statusTxt = isBlock ? 'Bloqueio' : (statusLabels[e.status] || e.status || '—');
+    const nameEl    = isBlock
+      ? `<span style="color:var(--text-muted);font-style:italic">${esc(e.notes || 'Bloqueio pessoal')}</span>`
+      : e.patientId
+        ? `<span class="patient-link" data-patient="${e.patientId}">${esc(e.patientName || '—')}</span>`
+        : esc(e.patientName || '—');
+    const timeRange = (e.startTime || e.endTime)
+      ? `<span style="font-weight:600;color:var(--text-muted);min-width:90px;flex-shrink:0">${fmtTime(e.startTime)}${e.endTime ? ' – '+fmtTime(e.endTime) : ''}</span>`
+      : '';
+    const subLine = isBlock ? '' : `<div style="font-size:.75rem;color:var(--text-muted)">${statusTxt} · ${labels.consultationType[e.consultationType] || e.consultationType || '—'}</div>`;
+    const notesLine = (!isBlock && e.notes)
+      ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>`
+      : '';
+
+    items.push(`<div class="cal-detail-item">
+      ${timeRange}
+      <div class="cal-detail-dot ${dotCls}" style="flex-shrink:0"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;color:var(--text)">${nameEl}</div>
+        ${subLine}${notesLine}
+      </div>
+      <div style="text-align:right;flex-shrink:0;font-weight:700;color:var(--text)">${(!isBlock && e.value) ? fmtBRL(e.value) : ''}</div>
+    </div>`);
+  }
+
+  el('cal-detail-list').innerHTML = items.join('');
   el('calendar-detail').classList.remove('hidden');
 }
 
@@ -1231,6 +1263,12 @@ el('form-rapido').addEventListener('submit', async (e) => {
 
 el('btn-nova-nota').addEventListener('click', () => openModalNota());
 
+el('btn-retorno-sort').addEventListener('click', () => {
+  S.retornoSort = S.retornoSort === 'asc' ? 'desc' : 'asc';
+  el('btn-retorno-sort').textContent = S.retornoSort === 'asc' ? 'Mais antigos primeiro ↑' : 'Mais recentes primeiro ↓';
+  renderRetornoAlert();
+});
+
 // NF bulk selection
 el('check-nf-all').addEventListener('change', (e) => {
   const pendNF = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
@@ -1354,12 +1392,18 @@ function renderRetornoAlert() {
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
   const semRetorno = Object.entries(patLastConsult)
-    .filter(([patId, lastDate]) => lastDate <= cutoffStr && !hasFuture.has(patId))
+    .filter(([patId, lastDate]) => {
+      if (lastDate > cutoffStr || hasFuture.has(patId)) return false;
+      const pac = S.data.patients.find(p => p.id === patId);
+      return pac && pac.status !== 'inativo';
+    })
     .map(([patId, lastDate]) => {
       const pac = S.data.patients.find(p => p.id === patId);
       return { patId, lastDate, name: pac?.name || '—', phone: pac?.phone || pac?.phone2 || '' };
     })
-    .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
+    .sort((a, b) => S.retornoSort === 'asc'
+      ? a.lastDate.localeCompare(b.lastDate)
+      : b.lastDate.localeCompare(a.lastDate));
 
   const pill = el('retorno-count-pill');
   if (pill) pill.textContent = semRetorno.length;
@@ -1759,7 +1803,9 @@ async function runImport() {
         const date     = parseBRDate(r.date || '') || '';
         if (!date || date < '2025-09-01') { results.eventsIgnored++; i++; continue; }
 
-        const status = (r.status || '').toLowerCase().trim();
+        const status    = (r.status || '').toLowerCase().trim();
+        const startTime = (r.start_time || '').substring(0, 5);
+        const endTime   = (r.end_time   || '').substring(0, 5);
         const { value, isTele } = extractEventData(r.description, r.procedure_pack);
         const consType = isTele ? 'teleconsulta' : 'presencial';
 
@@ -1768,6 +1814,8 @@ async function runImport() {
           iclinicPatientId: icPatId,
           iclinicEventId:   eventId,
           status,
+          startTime,
+          endTime,
           value,
           consultationType: consType,
           notes:            r.description || '',

@@ -115,6 +115,7 @@
       <!-- Filter Bar -->
       <div class="filter-bar" id="filter-bar">
         <div class="filter-presets" id="filter-presets">
+          <button class="filter-btn" data-period="semana">Esta semana</button>
           <button class="filter-btn active" data-period="mes">Este mês</button>
           <button class="filter-btn" data-period="mespassado">Mês passado</button>
           <button class="filter-btn" data-period="3meses">3 meses</button>
@@ -260,9 +261,11 @@
         <div class="view-header">
           <h2 class="view-title">Agenda</h2>
           <div class="calendar-nav">
-            <button class="btn btn-outline btn-sm" id="btn-cal-prev">← Anterior</button>
+            <button class="btn btn-outline btn-sm" id="btn-cal-year-prev">«</button>
+            <button class="btn btn-outline btn-sm" id="btn-cal-prev">← Mês</button>
             <span class="cal-month-label" id="cal-month-label">—</span>
-            <button class="btn btn-outline btn-sm" id="btn-cal-next">Próximo →</button>
+            <button class="btn btn-outline btn-sm" id="btn-cal-next">Mês →</button>
+            <button class="btn btn-outline btn-sm" id="btn-cal-year-next">»</button>
           </div>
         </div>
         <div class="card calendar-card">
@@ -484,11 +487,12 @@
           <!-- Alerta de Retorno -->
           <div class="card sec-card sec-card-wide">
             <div class="card-header">
-              <div style="display:flex;align-items:center;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h3>Pacientes sem Retorno Agendado</h3>
                 <span class="badge-pill" id="retorno-count-pill">0</span>
+                <button class="btn btn-sm btn-outline" id="btn-retorno-sort" style="margin-left:auto">Mais antigos primeiro ↑</button>
               </div>
-              <p class="card-subtitle" style="margin:4px 0 0">Pacientes com última consulta há mais de 45 dias e sem agendamento futuro</p>
+              <p class="card-subtitle" style="margin:4px 0 0">Pacientes ativos com última consulta há mais de 45 dias e sem agendamento futuro</p>
             </div>
             <div class="nf-list" id="retorno-list">
               <div class="empty-state">Nenhum paciente sem retorno agendado.</div>
