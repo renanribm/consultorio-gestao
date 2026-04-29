@@ -707,9 +707,14 @@
             </select>
           </div>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="desp-valor-group">
           <label for="desp-valor">Valor (R$) *</label>
           <input type="number" id="desp-valor" step="0.01" min="0" placeholder="0,00" required>
+        </div>
+        <div class="form-group hidden" id="desp-pct-group">
+          <label for="desp-pct">Alíquota (%) *</label>
+          <input type="number" id="desp-pct" step="0.01" min="0" max="100" placeholder="0,00">
+          <div id="desp-pct-preview" style="margin-top:6px;font-size:.8rem;color:var(--text-muted)"></div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline" data-close="modal-desp">Cancelar</button>

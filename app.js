@@ -1055,14 +1055,46 @@ function openModalRec(rec = null) {
 // ─────────────────────────────────────────────────────────────────────────────
 el('btn-nova-desp').addEventListener('click', () => openModalDesp());
 
+el('desp-cat').addEventListener('change', updateDespModalMode);
+el('desp-pct').addEventListener('input', updateDespPctPreview);
+
+function updateDespModalMode() {
+  const isImposto = el('desp-cat').value === 'impostos';
+  el('desp-valor-group').classList.toggle('hidden', isImposto);
+  el('desp-pct-group').classList.toggle('hidden', !isImposto);
+  el('desp-valor').required = !isImposto;
+  el('desp-pct').required   = isImposto;
+  if (isImposto) updateDespPctPreview();
+}
+
+function updateDespPctPreview() {
+  const pct          = parseFloat(el('desp-pct').value) || 0;
+  const grossRevenue = filteredRec().filter(r => r.status !== 'gratuito').reduce((s, r) => s + (r.value || 0), 0);
+  const calculated   = (pct / 100) * grossRevenue;
+  el('desp-pct-preview').textContent = pct > 0
+    ? `Sobre ${fmtBRL(grossRevenue)} de faturamento bruto = ${fmtBRL(calculated)}`
+    : '';
+}
+
 el('form-desp').addEventListener('submit', async (e) => {
   e.preventDefault();
+  const isImposto = el('desp-cat').value === 'impostos';
+  let value, taxRate;
+  if (isImposto) {
+    taxRate            = parseFloat(el('desp-pct').value) || 0;
+    const grossRevenue = filteredRec().filter(r => r.status !== 'gratuito').reduce((s, r) => s + (r.value || 0), 0);
+    value              = (taxRate / 100) * grossRevenue;
+  } else {
+    value   = parseFloat(el('desp-valor').value) || 0;
+    taxRate = null;
+  }
   const data = {
     date:        el('desp-data').value,
     description: el('desp-desc').value.trim(),
     category:    el('desp-cat').value,
     recurrence:  el('desp-rec').value,
-    value:       parseFloat(el('desp-valor').value) || 0,
+    value,
+    taxRate:     taxRate ?? null,
   };
   await saveDespesa(data, S.editingDesp);
   closeModal('modal-desp');
@@ -1085,7 +1117,7 @@ function renderDespesas() {
     <td>${esc(d.description||'—')}</td>
     <td><span class="cat-tag">${labels.expenseCategory[d.category]||d.category||'—'}</span></td>
     <td><span class="cat-tag">${labels.recurrence[d.recurrence]||'Única'}</span></td>
-    <td class="text-right value-cell" style="color:var(--red)">${fmtBRL(d.value||0)}</td>
+    <td class="text-right value-cell" style="color:var(--red)">${fmtBRL(d.value||0)}${d.taxRate ? `<span style="font-size:.75rem;color:var(--text-muted);margin-left:4px">(${d.taxRate}%)</span>` : ''}</td>
     <td><div class="action-btns">
       <button class="btn-edit" data-id="${d.id}" data-action="edit-desp">Editar</button>
       ${S.role==='medica'?`<button class="btn-del" data-id="${d.id}" data-action="del-desp">Excluir</button>`:''}
@@ -1101,7 +1133,10 @@ function openModalDesp(desp = null) {
   el('desp-desc').value  = desp ? (desp.description||'') : '';
   el('desp-cat').value   = desp ? (desp.category||'') : '';
   el('desp-rec').value   = desp ? (desp.recurrence||'unica') : 'unica';
+  el('desp-pct').value   = (desp?.category === 'impostos' && desp?.taxRate) ? desp.taxRate : '';
   el('desp-valor').value = desp ? (desp.value||'') : '';
+  el('desp-pct-preview').textContent = '';
+  updateDespModalMode();
   openModal('modal-desp');
 }
 
