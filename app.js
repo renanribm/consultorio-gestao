@@ -32,7 +32,7 @@ const S = {
   editingNota:     null,
   editingPaciente: null,
   currentPatient:  null,
-  importFiles:     { patient: null, bill: null, event: null },
+  importFiles:     { patient: null, event: null },
   nfSelected:      new Set(),
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
@@ -341,7 +341,7 @@ async function deleteNota(id) {
 async function savePatient(data, id = null) {
   showLoading();
   try {
-    if (id) { await updateDoc(doc(db, 'patients', id), { ...data, updatedAt: serverTimestamp() }); }
+    if (id) { await updateDoc(doc(db, 'patients', id), { ...data, manuallyEdited: true, updatedAt: serverTimestamp() }); }
     else    { await addDoc(collection(db, 'patients'), { ...data, createdAt: serverTimestamp(), createdBy: S.user.uid }); }
     await reloadCollection('patients');
     showToast('Paciente salvo!', 'success');
@@ -1285,8 +1285,67 @@ el('form-nf').addEventListener('submit', async (e) => {
 
 function renderSecretaria() {
   renderNFPendentes();
+  renderRetornoAlert();
   renderNotas();
   if (!el('r-data').value) el('r-data').value = today();
+}
+
+function renderRetornoAlert() {
+  const container = el('retorno-list');
+  if (!container) return;
+
+  const todayStr = today();
+  const DIAS_SEM_RETORNO = 45;
+
+  // patients with at least one past completed consultation
+  const completedStatuses = new Set(['cp', 'at', 'co']);
+  const patLastConsult = {};
+  S.data.consultations.forEach(c => {
+    if (!c.patientId || !c.date || c.date > todayStr) return;
+    if (!completedStatuses.has(c.status)) return;
+    if (!patLastConsult[c.patientId] || c.date > patLastConsult[c.patientId]) {
+      patLastConsult[c.patientId] = c.date;
+    }
+  });
+
+  // patients with a future scheduled consultation
+  const hasFuture = new Set();
+  S.data.consultations.forEach(c => {
+    if (c.patientId && c.date >= todayStr) hasFuture.add(c.patientId);
+  });
+
+  const cutoff = new Date(todayStr);
+  cutoff.setDate(cutoff.getDate() - DIAS_SEM_RETORNO);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+
+  const semRetorno = Object.entries(patLastConsult)
+    .filter(([patId, lastDate]) => lastDate <= cutoffStr && !hasFuture.has(patId))
+    .map(([patId, lastDate]) => {
+      const pac = S.data.patients.find(p => p.id === patId);
+      return { patId, lastDate, name: pac?.name || '—', phone: pac?.phone || pac?.phone2 || '' };
+    })
+    .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
+
+  const pill = el('retorno-count-pill');
+  if (pill) pill.textContent = semRetorno.length;
+  const badge = el('badge-retorno');
+  if (badge) { badge.textContent = semRetorno.length || ''; badge.classList.toggle('hidden', semRetorno.length === 0); }
+
+  if (!semRetorno.length) {
+    container.innerHTML = '<div class="empty-state">Nenhum paciente sem retorno agendado.</div>';
+    return;
+  }
+
+  container.innerHTML = semRetorno.map(p => `
+    <div class="nf-item">
+      <div class="nf-item-left" style="flex:1;min-width:0">
+        <div class="nf-item-name">
+          <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
+        </div>
+        <div class="nf-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${daysBetween(p.lastDate, todayStr)} dias sem retorno</div>
+        ${p.phone ? `<div class="nf-item-meta">${esc(p.phone)}</div>` : ''}
+      </div>
+    </div>`).join('');
 }
 
 function renderNFPendentes() {
@@ -1507,7 +1566,7 @@ el('btn-cancel-import').addEventListener('click', resetImport);
 el('btn-run-import').addEventListener('click',    runImport);
 
 function handleFileSelection(files) {
-  S.importFiles = { patient: null, bill: null, event: null };
+  S.importFiles = { patient: null, event: null };
   const detected = [];
   for (const file of files) {
     const reader = new FileReader();
@@ -1528,16 +1587,15 @@ function handleFileSelection(files) {
 }
 
 function detectCSVType(header) {
-  if (header.includes('patient_id') && header.includes('birthdate'))         return 'patient';
-  if (header.includes('Paciente')   && header.includes('Pago?'))             return 'bill';
-  if (header.includes('procedure_pack') && header.includes('schedule_id'))   return 'event';
+  if (header.includes('patient_id') && header.includes('birthdate'))       return 'patient';
+  if (header.includes('procedure_pack') && header.includes('schedule_id')) return 'event';
   return null;
 }
 
 function renderFilesPreview(detected) {
   const preview    = el('import-files-preview');
-  const icons      = { patient:'👤', bill:'💰', event:'📅' };
-  const typeLabels = { patient:'Pacientes', bill:'Financeiro', event:'Agendamentos' };
+  const icons      = { patient:'👤', event:'📅' };
+  const typeLabels = { patient:'Pacientes', event:'Agendamentos' };
   preview.innerHTML = detected.map(f => `
     <div class="import-file-row">
       <span class="import-file-icon">${icons[f.type]||'📄'}</span>
@@ -1550,7 +1608,7 @@ function renderFilesPreview(detected) {
 }
 
 function resetImport() {
-  S.importFiles = { patient: null, bill: null, event: null };
+  S.importFiles = { patient: null, event: null };
   csvInput.value = '';
   el('import-files-preview').classList.add('hidden');
   el('import-actions-bar').classList.add('hidden');
@@ -1559,34 +1617,28 @@ function resetImport() {
 }
 
 async function runImport() {
-  const { patient: patFile, bill: billFile, event: evtFile } = S.importFiles;
-  if (!patFile && !billFile && !evtFile) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
+  const { patient: patFile, event: evtFile } = S.importFiles;
+  if (!patFile && !evtFile) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
 
   el('import-actions-bar').classList.add('hidden');
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, billsAdded:0, billsUpdated:0, eventsAdded:0, eventsUpdated:0, recFromEvents:0, errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, errors:0 };
 
   try {
-    // ── 1. Pre-parse events → build eventMap for teleconsulta detection ────────
+    // ── 1. Pre-parse events ────────────────────────────────────────────────────
     let eventRows = [];
-    const eventMap = {};  // icPatId_date → { description, procedurePack, status }
     if (evtFile) {
       eventRows = parseCSV(evtFile.text);
-      eventRows.forEach(r => {
-        const pid  = r.patient_id || '';
-        const date = parseBRDate(r.date || '') || (r.date || '');
-        if (pid && date) eventMap[`${pid}_${date}`] = { description: r.description||'', procedurePack: r.procedure_pack||'', status: r.status||'' };
-      });
     }
-    setProgress(10, 'Eventos mapeados…');
+    setProgress(5, 'Arquivos lidos…');
 
-    // ── 2. Upsert patients ─────────────────────────────────────────────────────
+    // ── 2. Upsert patients — respeita dados curados manualmente ───────────────
     if (patFile) {
       const rows = parseCSV(patFile.text);
-      const existing = {};
-      S.data.patients.forEach(p => { if (p.iclinicPatientId) existing[p.iclinicPatientId] = p.id; });
+      const existingMap = {};
+      S.data.patients.forEach(p => { if (p.iclinicPatientId) existingMap[p.iclinicPatientId] = p; });
 
       let i = 0;
       for (const r of rows) {
@@ -1620,134 +1672,46 @@ async function runImport() {
           iclinicPk:        r.pk || '',
         };
 
-        if (existing[icId]) {
-          await updateDoc(doc(db, 'patients', existing[icId]), { ...data, updatedAt: serverTimestamp() });
-          results.patientsUpdated++;
+        const existing = existingMap[icId];
+        if (existing) {
+          if (existing.manuallyEdited) {
+            // Paciente curado manualmente: só atualiza IDs e status iClinic, preserva dados pessoais
+            await updateDoc(doc(db, 'patients', existing.id), {
+              iclinicPatientId: icId,
+              iclinicPk:        r.pk || '',
+              status:           data.status,
+              updatedAt:        serverTimestamp(),
+            });
+            results.patientsSkipped++;
+          } else {
+            await updateDoc(doc(db, 'patients', existing.id), { ...data, updatedAt: serverTimestamp() });
+            results.patientsUpdated++;
+          }
         } else {
           await addDoc(collection(db, 'patients'), { ...data, createdAt: serverTimestamp(), createdBy: S.user.uid });
           results.patientsAdded++;
         }
         i++;
-        if (i % 10 === 0) setProgress(10 + Math.round(i/rows.length*25), `Pacientes: ${i}/${rows.length}…`);
+        if (i % 10 === 0) setProgress(5 + Math.round(i/rows.length*45), `Pacientes: ${i}/${rows.length}…`);
       }
     }
     await reloadCollection('patients');
-    setProgress(35, 'Pacientes importados…');
+    setProgress(50, 'Pacientes importados…');
 
     // ── 3. Build patient id maps ───────────────────────────────────────────────
-    const pkToPatientId = {};
-    const icIdToDocId   = {};
-    const icIdToName    = {};
+    const icIdToDocId = {};
+    const icIdToName  = {};
     S.data.patients.forEach(p => {
-      if (p.iclinicPk && p.iclinicPatientId) pkToPatientId[p.iclinicPk] = p.iclinicPatientId;
       if (p.iclinicPatientId) {
         icIdToDocId[p.iclinicPatientId] = p.id;
         icIdToName[p.iclinicPatientId]  = p.name;
       }
     });
 
-    // ── 4. Upsert bills + build billCoveredSet ─────────────────────────────────
-    const billCoveredSet = new Set();
-    if (billFile) {
-      const rows = parseCSV(billFile.text);
-      const existingBills = {};
-      S.data.recebimentos.forEach(r => { if (r.iclinicBillId) existingBills[r.iclinicBillId] = r; });
-
-      let i = 0;
-      for (const r of rows) {
-        const billId = r.id;
-        if (!billId) { i++; continue; }
-        if ((r['Tipo']||'').toLowerCase() !== 'receita') { i++; continue; }
-
-        const date = parseBRDate(r['Data'] || '');
-        if (!date) { i++; continue; }
-
-        const patName  = (r['Paciente'] || '').trim();
-        const pkPac    = r['PK Paciente'] || '';
-        const icPatId  = pkToPatientId[pkPac] || '';
-        const patDocId = icIdToDocId[icPatId] || null;
-
-        // Detect teleconsulta via eventMap
-        const evtKey  = `${icPatId}_${date}`;
-        const evtData = eventMap[evtKey] || {};
-        const isTele  = (evtData.description||'').toLowerCase().includes('online') ||
-                        (evtData.description||'').toLowerCase().includes('tele') ||
-                        (evtData.procedurePack||'').toLowerCase().includes('online');
-        const consType = isTele ? 'teleconsulta' : 'presencial';
-
-        const value  = parseBRNumber(r['Valor'] || '0');
-        const paid   = (r['Pago?']||'').toLowerCase() === 'sim';
-        const status = value === 0 ? 'gratuito' : (paid ? 'pix' : 'pendente');
-
-        if (icPatId) billCoveredSet.add(`${icPatId}_${date}`);
-
-        const newData = {
-          date,
-          patient:          capitalizeName(patName),
-          patientId:        patDocId,
-          consultationType: consType,
-          value,
-          status,
-          iclinicBillId:    billId,
-          iclinicPatientPk: pkPac,
-          iclinicPatientId: icPatId,
-        };
-
-        if (existingBills[billId]) {
-          const ex = existingBills[billId];
-          if (ex.consolidated) {
-            // Consolidated records: iClinic only updates clinical/scheduling fields, never payment fields
-            await updateDoc(doc(db, 'recebimentos', ex.id), {
-              date, patient: capitalizeName(patName), patientId: patDocId,
-              consultationType: consType,
-              iclinicBillId: billId, iclinicPatientPk: pkPac, iclinicPatientId: icPatId,
-              updatedAt: serverTimestamp(),
-            });
-          } else {
-            const safeStatus    = ex.status       === 'pix'     ? 'pix'     : status;
-            const safeInvStatus = ex.invoiceStatus === 'emitida' ? 'emitida' : (ex.invoiceStatus || 'pendente');
-            await updateDoc(doc(db, 'recebimentos', ex.id), {
-              ...newData,
-              status:        safeStatus,
-              invoiceStatus: safeInvStatus,
-              invoiceNumber: ex.invoiceNumber || '',
-              notes:         ex.notes         || '',
-              updatedAt: serverTimestamp(),
-            });
-          }
-          results.billsUpdated++;
-        } else {
-          await addDoc(collection(db, 'recebimentos'), {
-            ...newData,
-            invoiceStatus: 'pendente',
-            invoiceNumber: '',
-            notes:         '',
-            createdAt:     serverTimestamp(),
-            createdBy:     S.user.uid,
-          });
-          results.billsAdded++;
-        }
-        i++;
-        if (i % 20 === 0) setProgress(35 + Math.round(i/rows.length*30), `Financeiro: ${i}/${rows.length}…`);
-      }
-    }
-    await reloadCollection('recebimentos');
-    setProgress(65, 'Financeiro importado…');
-
-    // ── 5. Upsert consultations + recebimentos from 2024+ events ──────────────
+    // ── 4. Upsert consultations (calendário) ───────────────────────────────────
     if (evtFile && eventRows.length) {
-      const existingConsult  = {};
+      const existingConsult = {};
       S.data.consultations.forEach(c => { if (c.iclinicEventId) existingConsult[c.iclinicEventId] = c; });
-
-      const existingEventRec = {};
-      S.data.recebimentos.forEach(r => { if (r.iclinicEventId) existingEventRec[r.iclinicEventId] = r; });
-
-      // Protect consolidated records: add them to billCoveredSet so event import never creates duplicates
-      S.data.recebimentos.forEach(r => {
-        if (r.consolidated && r.iclinicPatientId && r.date) billCoveredSet.add(`${r.iclinicPatientId}_${r.date}`);
-      });
-
-      const completedStatuses = new Set(['cp', 'at', 'co']);
 
       let i = 0;
       for (const r of eventRows) {
@@ -1761,59 +1725,35 @@ async function runImport() {
         if (!date) { i++; continue; }
 
         const status = (r.status || '').toLowerCase().trim();
-        const { value, payStatus, isTele } = extractEventData(r.description, r.procedure_pack);
+        const { value, isTele } = extractEventData(r.description, r.procedure_pack);
         const consType = isTele ? 'teleconsulta' : 'presencial';
 
-        // Upsert consultation (ALL events → calendar)
         const consultData = {
           date,
-          patientId:        patDocId,
-          patientName:      patName,
           iclinicPatientId: icPatId,
+          iclinicEventId:   eventId,
           status,
           value,
           consultationType: consType,
-          iclinicEventId:   eventId,
           notes:            r.description || '',
         };
 
         if (existingConsult[eventId]) {
-          await updateDoc(doc(db, 'consultations', existingConsult[eventId].id), { ...consultData, updatedAt: serverTimestamp() });
+          const ex = existingConsult[eventId];
+          // Preserva patientId/patientName se foram corrigidos manualmente
+          const patUpdate = ex.patientId ? {} : { patientId: patDocId, patientName: patName };
+          await updateDoc(doc(db, 'consultations', ex.id), { ...consultData, ...patUpdate, updatedAt: serverTimestamp() });
           results.eventsUpdated++;
         } else {
-          await addDoc(collection(db, 'consultations'), { ...consultData, createdAt: serverTimestamp() });
+          await addDoc(collection(db, 'consultations'), { ...consultData, patientId: patDocId, patientName: patName, createdAt: serverTimestamp() });
           results.eventsAdded++;
         }
 
-        // For 2024+ completed events not covered by bill: create recebimento (skip personal blocks)
-        const year = parseInt(date.split('-')[0]);
-        if (icPatId && year >= 2024 && completedStatuses.has(status) && !billCoveredSet.has(`${icPatId}_${date}`) && !existingEventRec[eventId]) {
-          const evtPayStatus = value === 0 ? 'gratuito' : payStatus;
-          await addDoc(collection(db, 'recebimentos'), {
-            date,
-            patient:          patName,
-            patientId:        patDocId,
-            consultationType: consType,
-            value,
-            status:           evtPayStatus,
-            invoiceStatus:    evtPayStatus === 'gratuito' ? 'isenta' : 'pendente',
-            invoiceNumber:    '',
-            notes:            r.description || '',
-            iclinicEventId:   eventId,
-            iclinicPatientId: icPatId,
-            createdAt:        serverTimestamp(),
-            createdBy:        S.user.uid,
-          });
-          results.recFromEvents++;
-          billCoveredSet.add(`${icPatId}_${date}`);
-        }
-
         i++;
-        if (i % 20 === 0) setProgress(65 + Math.round(i/eventRows.length*30), `Agendamentos: ${i}/${eventRows.length}…`);
+        if (i % 20 === 0) setProgress(50 + Math.round(i/eventRows.length*48), `Agendamentos: ${i}/${eventRows.length}…`);
       }
     }
 
-    await reloadCollection('recebimentos');
     await reloadCollection('consultations');
     updateBadges();
     setProgress(100, 'Concluído!');
@@ -1822,12 +1762,10 @@ async function runImport() {
     res.className = 'import-result success';
     res.innerHTML = `
       <strong>✓ Importação concluída!</strong><br><br>
-      👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados<br>
-      💰 Recebimentos (financeiro): <strong>${results.billsAdded} adicionados</strong>, ${results.billsUpdated} atualizados<br>
+      👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados${results.patientsSkipped ? `, ${results.patientsSkipped} com dados curados preservados` : ''}<br>
       📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados<br>
-      ${results.recFromEvents ? `<strong>✨ ${results.recFromEvents} recebimento${results.recFromEvents > 1 ? 's' : ''} criado${results.recFromEvents > 1 ? 's' : ''} via agenda 2024+</strong><br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
-      <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Recebimentos</strong> e <strong>Agenda</strong>.
+      <br><br>Dados disponíveis em <strong>Pacientes</strong> e <strong>Agenda</strong>.
     `;
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');
@@ -1845,240 +1783,8 @@ function setProgress(pct, label) {
   el('import-progress-label').textContent = label;
 }
 
-// ── IMPORTAÇÃO CONTROLE SECRETÁRIA ───────────────────────────────────────────
-const csvInputSec   = el('csv-input-sec');
-const uploadAreaSec = el('upload-area-sec');
+// ── (importação CSV secretária removida — pagamentos lançados manualmente) ────
 
-uploadAreaSec.addEventListener('dragover',  e => { e.preventDefault(); uploadAreaSec.classList.add('dragover'); });
-uploadAreaSec.addEventListener('dragleave', ()  => uploadAreaSec.classList.remove('dragover'));
-uploadAreaSec.addEventListener('drop', e => {
-  e.preventDefault(); uploadAreaSec.classList.remove('dragover');
-  handleSecretariaFiles([...e.dataTransfer.files]);
-});
-csvInputSec.addEventListener('change', () => handleSecretariaFiles([...csvInputSec.files]));
-
-el('btn-cancel-import-sec').addEventListener('click', resetSecretariaImport);
-el('btn-run-import-sec').addEventListener('click',    runSecretariaImport);
-
-let secFiles = [];
-
-function handleSecretariaFiles(files) {
-  secFiles = [];
-  const detected = [];
-  let loaded = 0;
-  for (const file of files) {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const text = e.target.result;
-      const isValid = text.includes('DATA CONSULTA') && text.includes('NF ENVIADA');
-      if (isValid) {
-        secFiles.push({ file, text, name: file.name });
-        detected.push({ name: file.name, ok: true });
-      } else {
-        detected.push({ name: file.name, ok: false });
-      }
-      loaded++;
-      if (loaded === files.length) renderSecFilesPreview(detected);
-    };
-    reader.readAsText(file, 'UTF-8');
-  }
-}
-
-function renderSecFilesPreview(detected) {
-  const preview = el('import-files-preview-sec');
-  preview.innerHTML = detected.map(f => `
-    <div class="import-file-row">
-      <span class="import-file-icon">${f.ok ? '📋' : '📄'}</span>
-      <span class="import-file-name">${esc(f.name)}</span>
-      <span class="import-file-type ${f.ok ? 'detected' : 'unknown'}">${f.ok ? 'Controle Secretária' : 'Não reconhecido'}</span>
-    </div>`).join('');
-  preview.classList.remove('hidden');
-  el('import-actions-bar-sec').classList.remove('hidden');
-  el('import-result-sec').classList.add('hidden');
-}
-
-function resetSecretariaImport() {
-  secFiles = [];
-  csvInputSec.value = '';
-  el('import-files-preview-sec').classList.add('hidden');
-  el('import-actions-bar-sec').classList.add('hidden');
-  el('import-progress-sec').classList.add('hidden');
-  el('import-result-sec').classList.add('hidden');
-}
-
-function setProgressSec(pct, label) {
-  el('import-progress-fill-sec').style.width = pct + '%';
-  el('import-progress-label-sec').textContent = label;
-}
-
-function normalizeName(name) { return normalizeStr(name); }
-
-function parseSecretariaCSV(text) {
-  const lines = text.split(/\r?\n/);
-  const headerIdx = lines.findIndex(l => l.includes('DATA CONSULTA'));
-  if (headerIdx < 0) return [];
-
-  const hdrs = splitCSVLine(lines[headerIdx], ',').map(h => h.replace(/^"|"$/g, '').trim());
-  const rows = [];
-
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    const vals = splitCSVLine(line, ',').map(v => v.replace(/^"|"$/g, '').trim());
-    // Skip day-of-week separator rows: only col 0 has text, rest are empty/commas
-    const filled = vals.filter(v => v && v !== '-');
-    if (filled.length <= 1) continue;
-    // Must start with a date pattern DD/MM/YYYY
-    if (!/^\d{2}\/\d{2}\/\d{4}$/.test(vals[0])) continue;
-    rows.push(Object.fromEntries(hdrs.map((h, j) => [h, vals[j] || ''])));
-  }
-  return rows;
-}
-
-// Fuzzy name match within same-date candidates.
-// Returns the single recebimento whose name best matches targetNorm, or null if ambiguous/not found.
-function findRecByNameFuzzy(targetNorm, candidates) {
-  // 1. Exact normalized match
-  const exact = candidates.find(c => normalizeName(c.patient) === targetNorm);
-  if (exact) return exact;
-
-  const targetTokens = targetNorm.split(' ').filter(Boolean);
-
-  // 2. All tokens of the CSV name appear in the stored name (handles iClinic adding extra particles)
-  const supersets = candidates.filter(c => {
-    const stored = normalizeName(c.patient).split(' ').filter(Boolean);
-    return targetTokens.every(t => stored.includes(t));
-  });
-  if (supersets.length === 1) return supersets[0];
-
-  // 3. First + last token match (handles middle-name differences)
-  if (targetTokens.length >= 2) {
-    const first = targetTokens[0];
-    const last  = targetTokens[targetTokens.length - 1];
-    const fl = candidates.filter(c => {
-      const stored = normalizeName(c.patient).split(' ').filter(Boolean);
-      return stored.includes(first) && stored.includes(last);
-    });
-    if (fl.length === 1) return fl[0];
-  }
-
-  return null;
-}
-
-async function runSecretariaImport() {
-  if (!secFiles.length) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
-
-  el('import-actions-bar-sec').classList.add('hidden');
-  el('import-progress-sec').classList.remove('hidden');
-  setProgressSec(0, 'Iniciando…');
-
-  const results = { updated: 0, fuzzy: 0, created: 0, skipped: 0 };
-
-  try {
-    // Build lookup: "YYYY-MM-DD_normalizedName" → recebimento (exact)
-    const recMap    = {};
-    // Build lookup: date → [recebimentos] (for fuzzy fallback)
-    const recByDate = {};
-    S.data.recebimentos.forEach(r => {
-      if (!r.date || !r.patient) return;
-      recMap[`${r.date}_${normalizeName(r.patient)}`] = r;
-      (recByDate[r.date] = recByDate[r.date] || []).push(r);
-    });
-
-    // Build lookup: normalizedName → patient (for new records)
-    const patByName = {};
-    S.data.patients.forEach(p => { if (p.name) patByName[normalizeName(p.name)] = p; });
-
-    // Collect all rows from all selected files
-    const allRows = [];
-    for (const f of secFiles) allRows.push(...parseSecretariaCSV(f.text));
-
-    setProgressSec(10, `${allRows.length} registros encontrados…`);
-
-    let i = 0;
-    for (const row of allRows) {
-      const date = parseBRDate(row['DATA CONSULTA'] || '');
-      if (!date) { results.skipped++; i++; continue; }
-
-      const patNameRaw = (row['PACIENTE'] || '').trim();
-      if (!patNameRaw) { results.skipped++; i++; continue; }
-      const patName  = capitalizeName(patNameRaw);
-      const normNm   = normalizeName(patName);
-
-      const meio       = (row['MEIO'] || '').trim().toLowerCase();
-      const consType   = meio === 'online' ? 'teleconsulta' : 'presencial';
-      const value      = parseBRNumber((row['VALOR'] || '').replace(/R\$\s*/, ''));
-      const pagamento  = (row['PAGAMENTO']  || '').trim().toLowerCase();
-      const nfEnviada  = (row['NF ENVIADA'] || '').trim().toLowerCase();
-      const status     = value === 0 ? 'gratuito' : (pagamento === 'sim' ? 'pix' : 'pendente');
-      const invStatus  = value === 0 ? 'isenta'   : (nfEnviada === 'sim' ? 'emitida' : 'pendente');
-      const payDateRaw = (row['DATA PAGAMENTO'] || '').trim();
-      const paymentDate = (payDateRaw && payDateRaw !== '-') ? parseBRDate(payDateRaw) : '';
-      const obsRaw     = (row['OBSERVAÇÃO'] || '').trim();
-      const obs        = obsRaw && obsRaw !== '-' ? obsRaw : '';
-
-      // Exact match first, then fuzzy within same date
-      let existing = recMap[`${date}_${normNm}`];
-      let wasFuzzy = false;
-      if (!existing) {
-        existing = findRecByNameFuzzy(normNm, recByDate[date] || []);
-        if (existing) wasFuzzy = true;
-      }
-
-      if (existing) {
-        const updates = { consultationType: consType, value, status, invoiceStatus: invStatus, consolidated: true, updatedAt: serverTimestamp() };
-        if (paymentDate) updates.paymentDate = paymentDate;
-        if (obs && !existing.notes) updates.notes = obs;
-        await updateDoc(doc(db, 'recebimentos', existing.id), updates);
-        if (wasFuzzy) results.fuzzy++; else results.updated++;
-      } else {
-        const patFuzzy = !patByName[normNm] ? S.data.patients.find(p => findRecByNameFuzzy(normNm, [{ patient: p.name }])) : null;
-        const pat      = patByName[normNm] || patFuzzy || null;
-        const patDocId = pat ? pat.id : null;
-        const patIcId  = pat ? (pat.iclinicPatientId || '') : '';
-        const newRec = {
-          date, patient: patName, patientId: patDocId,
-          iclinicPatientId: patIcId,
-          consultationType: consType, value, status,
-          invoiceStatus: invStatus, invoiceNumber: '',
-          notes: obs,
-          source: 'secretaria',
-          consolidated: true,
-          createdAt: serverTimestamp(), createdBy: S.user.uid,
-        };
-        if (paymentDate) newRec.paymentDate = paymentDate;
-        await addDoc(collection(db, 'recebimentos'), newRec);
-        results.created++;
-      }
-
-      i++;
-      if (i % 10 === 0) setProgressSec(10 + Math.round(i / allRows.length * 85), `Processando: ${i}/${allRows.length}…`);
-    }
-
-    await reloadCollection('recebimentos');
-    updateBadges();
-    setProgressSec(100, 'Concluído!');
-
-    const res = el('import-result-sec');
-    res.className = 'import-result success';
-    const totalUpdated = results.updated + results.fuzzy;
-    res.innerHTML = `
-      <strong>✓ Fusão concluída!</strong><br><br>
-      ✅ <strong>${totalUpdated} recebimentos atualizados</strong>${results.fuzzy ? ` (${results.fuzzy} por correspondência aproximada de nome)` : ''}<br>
-      ➕ <strong>${results.created} recebimentos criados</strong> (sem correspondência no iClinic)<br>
-      ${results.skipped ? `⚠ ${results.skipped} linha${results.skipped > 1 ? 's' : ''} ignorada${results.skipped > 1 ? 's' : ''}.<br>` : ''}
-      <br>Confira em <strong>Recebimentos</strong> — novos registros aparecem com a origem "secretaria".
-    `;
-    res.classList.remove('hidden');
-    el('import-progress-sec').classList.add('hidden');
-    showToast('Fusão concluída!', 'success');
-  } catch (err) {
-    handleErr(err);
-    setProgressSec(0, '');
-    el('import-progress-sec').classList.add('hidden');
-    el('import-actions-bar-sec').classList.remove('hidden');
-  }
-}
 
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -2252,32 +1958,22 @@ function capitalizeName(str) {
 }
 
 function extractEventData(description, procedurePack) {
-  let value     = 0;
-  let payStatus = 'pendente';
-  let isTele    = false;
+  let value  = 0;
+  let isTele = false;
 
   const desc = (description || '').toLowerCase();
   isTele = desc.includes('online') || desc.includes('teleconsult');
 
-  // Extract value from description: "Pago pix (500)" or "Pago pix (450,00)"
   const descValMatch = (description || '').match(/\((\d+(?:[,\.]\d+)?)\)/);
-  if (descValMatch) {
-    value = parseBRNumber(descValMatch[1]);
-  }
+  if (descValMatch) value = parseBRNumber(descValMatch[1]);
 
-  // Detect payment from description
-  if (desc.includes('pago') || desc.includes('pix') || desc.includes('receb')) {
-    payStatus = 'pix';
-  }
-
-  // If no value from description, try procedure_pack: "Consulta 600,00" or "Consulta 600"
   if (!value && procedurePack) {
     const ppMatch = procedurePack.match(/[Cc]onsulta\s*([\d.,]+)/);
     if (ppMatch) value = parseBRNumber(ppMatch[1]);
     if (!isTele && procedurePack.toLowerCase().includes('online')) isTele = true;
   }
 
-  return { value, payStatus, isTele };
+  return { value, isTele };
 }
 
 function statusBadge(status) {

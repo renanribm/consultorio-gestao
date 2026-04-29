@@ -83,6 +83,7 @@
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
           <span class="nav-label">Painel Secretária</span>
           <span class="nav-badge hidden" id="badge-nf">0</span>
+          <span class="nav-badge hidden" id="badge-retorno" style="background:var(--amber,#d97706)">0</span>
         </a>
         <a class="nav-item nav-medica-only hidden" data-view="dre" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
@@ -480,6 +481,20 @@
             </form>
           </div>
 
+          <!-- Alerta de Retorno -->
+          <div class="card sec-card sec-card-wide">
+            <div class="card-header">
+              <div style="display:flex;align-items:center;gap:10px">
+                <h3>Pacientes sem Retorno Agendado</h3>
+                <span class="badge-pill" id="retorno-count-pill">0</span>
+              </div>
+              <p class="card-subtitle" style="margin:4px 0 0">Pacientes com última consulta há mais de 45 dias e sem agendamento futuro</p>
+            </div>
+            <div class="nf-list" id="retorno-list">
+              <div class="empty-state">Nenhum paciente sem retorno agendado.</div>
+            </div>
+          </div>
+
           <!-- Anotações Internas -->
           <div class="card sec-card sec-card-wide">
             <div class="card-header">
@@ -532,18 +547,18 @@
             <h3>Como exportar do iClinic</h3>
             <ol>
               <li>No iClinic, vá em <strong>Relatórios → Exportar dados</strong></li>
-              <li>Selecione o período e exporte os 3 arquivos: <strong>Pacientes</strong>, <strong>Financeiro (bill)</strong> e <strong>Agendamentos (event_scheduling)</strong></li>
-              <li>Selecione os 3 arquivos abaixo de uma vez</li>
+              <li>Exporte os 2 arquivos: <strong>Pacientes (patient)</strong> e <strong>Agendamentos (event_scheduling)</strong></li>
+              <li>Selecione os arquivos abaixo</li>
               <li>Clique em <strong>Importar / Atualizar</strong> — registros já existentes serão atualizados, sem duplicatas</li>
             </ol>
-            <p class="import-note">Pode rodar quantas vezes quiser. O sistema detecta automaticamente cada arquivo pelo conteúdo.</p>
+            <p class="import-note">Pode rodar quantas vezes quiser. Dados corrigidos manualmente nos pacientes são preservados automaticamente.</p>
           </div>
 
           <label class="upload-area" id="upload-area">
             <input type="file" id="csv-input" accept=".csv" multiple class="hidden">
             <div class="upload-icon">📂</div>
             <div class="upload-text">Clique para selecionar os arquivos CSV do iClinic</div>
-            <div class="upload-sub">Selecione os 3 arquivos de uma vez (patient · bill · event_scheduling)</div>
+            <div class="upload-sub">Selecione os 2 arquivos (patient · event_scheduling)</div>
           </label>
 
           <div class="import-files-preview hidden" id="import-files-preview"></div>
@@ -562,38 +577,6 @@
           </div>
 
           <div class="import-result hidden" id="import-result"></div>
-        </div>
-
-        <div class="card import-card" style="margin-top:1.5rem">
-          <div class="import-instructions">
-            <h3>Controle de pagamentos — Secretária</h3>
-            <p>Selecione os CSVs mensais da secretária (<em>Controle pagamento - 2026 - Mês_2026.csv</em>). O sistema cruzará cada linha com os recebimentos existentes por data + nome do paciente, atualizando status de pagamento, NF e valor. Linhas sem correspondência serão criadas como novos recebimentos.</p>
-            <p class="import-note">Pode rodar múltiplos meses de uma vez. Seguro repetir — atualiza sem duplicar.</p>
-          </div>
-
-          <label class="upload-area" id="upload-area-sec">
-            <input type="file" id="csv-input-sec" accept=".csv" multiple class="hidden">
-            <div class="upload-icon">📋</div>
-            <div class="upload-text">Clique para selecionar os CSVs da secretária</div>
-            <div class="upload-sub">Selecione um ou mais arquivos mensais de uma vez</div>
-          </label>
-
-          <div class="import-files-preview hidden" id="import-files-preview-sec"></div>
-
-          <div class="import-actions-bar hidden" id="import-actions-bar-sec">
-            <button class="btn btn-outline" id="btn-cancel-import-sec">Cancelar</button>
-            <button class="btn btn-primary" id="btn-run-import-sec">
-              <svg viewBox="0 0 20 20" fill="currentColor" width="16"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-              Fundir com iClinic
-            </button>
-          </div>
-
-          <div class="import-progress hidden" id="import-progress-sec">
-            <div class="import-progress-bar"><div id="import-progress-fill-sec"></div></div>
-            <div id="import-progress-label-sec">Processando…</div>
-          </div>
-
-          <div class="import-result hidden" id="import-result-sec"></div>
         </div>
 
         <div class="card import-card" style="margin-top:1.5rem;border:2px solid var(--danger,#e53e3e)">
