@@ -91,9 +91,7 @@ el('btn-logout').addEventListener('click', () => signOut(auth));
 function applyRoleUI() {
   const isMedica = S.role === 'medica';
   document.querySelectorAll('.nav-medica-only').forEach(e => e.classList.toggle('hidden', !isMedica));
-  const initial = isMedica ? 'M' : 'S';
-  el('sidebar-avatar').textContent    = initial;
-  el('mobile-avatar').textContent     = initial;
+  el('sidebar-avatar').textContent    = isMedica ? 'M' : 'S';
   el('sidebar-user-name').textContent = S.user.email.split('@')[0];
   el('sidebar-user-role').textContent = labels.role[S.role];
   el('login-screen').classList.add('hidden');
@@ -137,6 +135,7 @@ el('btn-mobile-menu').addEventListener('click', () => {
   el('sidebar').classList.contains('mobile-open') ? closeMobileDrawer() : openMobileDrawer();
 });
 el('sidebar-backdrop').addEventListener('click', closeMobileDrawer);
+el('btn-mobile-logout').addEventListener('click', () => signOut(auth));
 
 function navigateTo(view) {
   if (S.role === 'secretaria' && (view === 'dre' || view === 'import')) {
@@ -658,6 +657,12 @@ el('btn-cal-next').addEventListener('click', () => {
 });
 el('btn-cal-year-prev').addEventListener('click', () => { S.calendarYear--; renderAgenda(); });
 el('btn-cal-year-next').addEventListener('click', () => { S.calendarYear++; renderAgenda(); });
+el('btn-cal-today').addEventListener('click', () => {
+  const now = new Date();
+  S.calendarYear = now.getFullYear();
+  S.calendarMonth = now.getMonth();
+  renderAgenda();
+});
 el('btn-cal-close-detail').addEventListener('click', () => {
   S.calendarSelDay = null;
   el('calendar-detail').classList.add('hidden');
@@ -1386,7 +1391,7 @@ function renderRetornoAlert() {
   if (!container) return;
 
   const todayStr = today();
-  const DIAS_SEM_RETORNO = 45;
+  const DIAS_SEM_RETORNO = 30;
 
   // patients with at least one past completed consultation
   const completedStatuses = new Set(['cp', 'at', 'co']);
@@ -1427,6 +1432,15 @@ function renderRetornoAlert() {
   if (pill) pill.textContent = semRetorno.length;
   const badge = el('badge-retorno');
   if (badge) { badge.textContent = semRetorno.length || ''; badge.classList.toggle('hidden', semRetorno.length === 0); }
+  const banner = el('retorno-banner');
+  if (banner) {
+    if (semRetorno.length > 0) {
+      el('retorno-banner-text').textContent = `${semRetorno.length} paciente${semRetorno.length > 1 ? 's precisam' : ' precisa'} ser contatado${semRetorno.length > 1 ? 's' : ''} — sem consulta há mais de 30 dias sem agendamento futuro.`;
+      banner.classList.remove('hidden');
+    } else {
+      banner.classList.add('hidden');
+    }
+  }
 
   if (!semRetorno.length) {
     container.innerHTML = '<div class="empty-state">Nenhum paciente sem retorno agendado.</div>';
@@ -1434,14 +1448,13 @@ function renderRetornoAlert() {
   }
 
   container.innerHTML = semRetorno.map(p => `
-    <div class="nf-item">
-      <div class="nf-item-left" style="flex:1;min-width:0">
-        <div class="nf-item-name">
-          <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
-        </div>
-        <div class="nf-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${daysBetween(p.lastDate, todayStr)} dias sem retorno</div>
-        ${p.phone ? `<div class="nf-item-meta">${esc(p.phone)}</div>` : ''}
+    <div class="retorno-item">
+      <div class="retorno-item-name">
+        <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
       </div>
+      <div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)}</div>
+      <div class="retorno-item-meta">${daysBetween(p.lastDate, todayStr)} dias sem retorno</div>
+      ${p.phone ? `<div class="retorno-item-phone">${esc(p.phone)}</div>` : ''}
     </div>`).join('');
 }
 
@@ -2086,7 +2099,7 @@ function nfBadge(status) {
   return `<span class="badge ${cls[status]||''}">${labels.invoiceStatus[status]||status||'—'}</span>`;
 }
 function patientStatusBadge(status) {
-  const cls = {ativo:'badge-ativo',inativo:'badge-inativo',alta:'badge-alta'};
+  const cls = {ativo:'badge-ativo',inativo:'badge-inativo'};
   return `<span class="badge ${cls[status]||''}">${labels.patientStatus[status]||status||'—'}</span>`;
 }
 
