@@ -533,15 +533,15 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .chip-mobile { display: none; }
 .chip-desktop { display: inline; }
 .cal-holiday { font-size: .58rem; font-weight: 700; padding: 1px 4px; border-radius: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.5; flex-shrink: 0; }
-.cal-holiday-nacional   { background: #fef3c7; color: #92400e; }
+.cal-holiday-nacional,
 .cal-holiday-estadual,
-.cal-holiday-municipal  { background: #dbeafe; color: #1e40af; }
-.cal-holiday-facultativo{ background: #f3f4f6; color: #6b7280; }
+.cal-holiday-municipal,
+.cal-holiday-facultativo { background: #fef3c7; color: #92400e; }
 .cal-detail-holiday { display: flex; align-items: center; gap: 8px; padding: 8px 22px; border-bottom: 1px solid var(--border-light); font-size: .82rem; font-weight: 600; }
-.cal-detail-holiday-nacional  { background: #fef9ec; color: #92400e; }
+.cal-detail-holiday-nacional,
 .cal-detail-holiday-estadual,
-.cal-detail-holiday-municipal { background: #eff6ff; color: #1e40af; }
-.cal-detail-holiday-facultativo { background: #f9fafb; color: #6b7280; }
+.cal-detail-holiday-municipal,
+.cal-detail-holiday-facultativo { background: #fef9ec; color: #92400e; }
 .cal-chip-cp, .cal-chip-at { background: #d1fae5; color: #065f46; }
 .cal-chip-sc  { background: var(--blue-bg); color: #1e40af; }
 .cal-chip-na  { background: var(--red-bg); color: #991b1b; }
