@@ -291,7 +291,8 @@ function handleErr(err) {
 }
 
 function updateBadges() {
-  const pendRec = S.data.recebimentos.filter(r => r.status === 'pendente');
+  const todayStr = today();
+  const pendRec = S.data.recebimentos.filter(r => r.status === 'pendente' && r.date <= todayStr);
   const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
   setCount('badge-inadimplencia', pendRec.length);
   setCount('badge-nf', pendNF.length);
@@ -1354,8 +1355,9 @@ function openModalDesp(desp = null) {
 // INADIMPLÊNCIA
 // ─────────────────────────────────────────────────────────────────────────────
 function renderInadimplencia() {
+  const todayStr = today();
   const pendentes = S.data.recebimentos
-    .filter(r => r.status === 'pendente')
+    .filter(r => r.status === 'pendente' && r.date <= todayStr)
     .sort((a,b) => a.date.localeCompare(b.date));
 
   // Clean stale selections
@@ -1958,13 +1960,19 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, recAdded:0, recSkipped:0, errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, recAdded:0, recSkipped:0, unmatched:[], errors:0 };
 
   try {
-    // ── 1. Pre-parse events ────────────────────────────────────────────────────
+    // ── 1. Pre-parse files + build iClinic name map ───────────────────────────
     let eventRows = [];
     if (evtFile) {
       eventRows = parseCSV(evtFile.text);
+    }
+    const icIdToIclinicName = {};
+    if (patFile) {
+      parseCSV(patFile.text).forEach(r => {
+        if (r.patient_id && r.name) icIdToIclinicName[r.patient_id] = capitalizeName((r.name || '').trim());
+      });
     }
     setProgress(5, 'Arquivos lidos…');
 
@@ -2112,7 +2120,11 @@ async function runImport() {
 
         const icPatId  = r.patient_id || '';
         const patDocId = icIdToDocId[icPatId] || null;
-        if (!patDocId) { results.recSkipped++; continue; }
+        if (!patDocId) {
+          const icName = icIdToIclinicName[icPatId] || icIdToName[icPatId] || icPatId;
+          results.unmatched.push({ date, name: icName, desc: (r.description || '').substring(0, 70) });
+          continue;
+        }
 
         if (existingByEventId[eventId] || existingByPatDate[`${patDocId}_${date}`]) {
           results.recSkipped++; continue;
@@ -2126,7 +2138,7 @@ async function runImport() {
 
         await addDoc(collection(db, 'recebimentos'), {
           patientId:        patDocId,
-          patientName:      icIdToName[icPatId] || '',
+          patient:          icIdToName[icPatId] || '',
           date,
           value,
           status:           isPago ? 'pix' : 'pendente',
@@ -2148,16 +2160,18 @@ async function runImport() {
     updateBadges();
     setProgress(100, 'Concluído!');
 
-    // Gravar registro da última importação
-    await setDoc(doc(db, 'metadata', 'lastImport'), {
-      timestamp:        serverTimestamp(),
-      userEmail:        S.user.email,
-      patientsAdded:    results.patientsAdded,
-      patientsUpdated:  results.patientsUpdated,
-      patientsSkipped:  results.patientsSkipped,
-      eventsAdded:      results.eventsAdded,
-      eventsUpdated:    results.eventsUpdated,
-    });
+    // Gravar registro da última importação (falha silenciosamente se sem permissão)
+    try {
+      await setDoc(doc(db, 'metadata', 'lastImport'), {
+        timestamp:        serverTimestamp(),
+        userEmail:        S.user.email,
+        patientsAdded:    results.patientsAdded,
+        patientsUpdated:  results.patientsUpdated,
+        patientsSkipped:  results.patientsSkipped,
+        eventsAdded:      results.eventsAdded,
+        eventsUpdated:    results.eventsUpdated,
+      });
+    } catch (_) { /* permissão negada para metadata — não interrompe */ }
 
     const res = el('import-result');
     res.className = 'import-result success';
@@ -2166,6 +2180,7 @@ async function runImport() {
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados${results.patientsSkipped ? `, ${results.patientsSkipped} com dados curados preservados` : ''}<br>
       📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
       ${results.recAdded || results.recSkipped ? `💳 Consultas futuras: <strong>${results.recAdded} criadas como pendentes</strong>${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
+      ${results.unmatched.length ? `<br>⚠ ${results.unmatched.length} consulta${results.unmatched.length > 1 ? 's futuras' : ' futura'} sem paciente vinculado — revisão manual:<br><span style="font-size:.78rem;color:var(--text-muted)">${results.unmatched.map(e => `&nbsp;&nbsp;· ${fmtDate(e.date)} — ${esc(e.name)}: ${esc(e.desc)}`).join('<br>')}</span><br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
       <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Agenda</strong> e <strong>Consultas</strong>.
     `;
