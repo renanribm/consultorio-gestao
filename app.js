@@ -1958,7 +1958,7 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, recAdded:0, recSkipped:0, errors:0 };
 
   try {
     // ── 1. Pre-parse events ────────────────────────────────────────────────────
@@ -2093,6 +2093,58 @@ async function runImport() {
     }
 
     await reloadCollection('consultations');
+
+    // ── 5. Create pending recebimentos for future events ──────────────────────
+    if (evtFile && eventRows.length) {
+      const todayStr = today();
+      const existingByEventId = {};
+      const existingByPatDate = {};
+      S.data.recebimentos.forEach(r => {
+        if (r.iclinicEventId) existingByEventId[r.iclinicEventId] = true;
+        if (r.patientId && r.date) existingByPatDate[`${r.patientId}_${r.date}`] = true;
+      });
+
+      for (const r of eventRows) {
+        const eventId = r.pk;
+        if (!eventId) continue;
+        const date = parseBRDate(r.date || '') || '';
+        if (!date || date < todayStr) continue;
+
+        const icPatId  = r.patient_id || '';
+        const patDocId = icIdToDocId[icPatId] || null;
+        if (!patDocId) { results.recSkipped++; continue; }
+
+        if (existingByEventId[eventId] || existingByPatDate[`${patDocId}_${date}`]) {
+          results.recSkipped++; continue;
+        }
+
+        const desc = r.description || '';
+        const valMatch = desc.match(/R\$\s*([\d.,]+)/i);
+        const value = valMatch ? parseBRNumber(valMatch[1]) : 0;
+        const isPago = /\bPAGO\b/i.test(desc);
+        const isTele = /online|teleconsult/i.test(desc.toLowerCase());
+
+        await addDoc(collection(db, 'recebimentos'), {
+          patientId:        patDocId,
+          patientName:      icIdToName[icPatId] || '',
+          date,
+          value,
+          status:           isPago ? 'pix' : 'pendente',
+          invoiceStatus:    'pendente',
+          consultationType: isTele ? 'teleconsulta' : 'presencial',
+          iclinicEventId:   eventId,
+          notes:            desc,
+          createdAt:        serverTimestamp(),
+          createdBy:        'iclinic-import',
+        });
+
+        existingByEventId[eventId] = true;
+        existingByPatDate[`${patDocId}_${date}`] = true;
+        results.recAdded++;
+      }
+      await reloadCollection('recebimentos');
+    }
+
     updateBadges();
     setProgress(100, 'Concluído!');
 
@@ -2113,8 +2165,9 @@ async function runImport() {
       <strong>✓ Importação concluída!</strong><br><br>
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados${results.patientsSkipped ? `, ${results.patientsSkipped} com dados curados preservados` : ''}<br>
       📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
+      ${results.recAdded || results.recSkipped ? `💳 Consultas futuras: <strong>${results.recAdded} criadas como pendentes</strong>${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
-      <br><br>Dados disponíveis em <strong>Pacientes</strong> e <strong>Agenda</strong>.
+      <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Agenda</strong> e <strong>Consultas</strong>.
     `;
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');

@@ -506,7 +506,7 @@
           </div>
 
           <!-- Alerta de Retorno -->
-          <div class="card sec-card sec-card-wide">
+          <div class="card sec-card">
             <div class="card-header">
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h3>Pacientes sem Retorno Agendado</h3>
@@ -520,8 +520,19 @@
             </div>
           </div>
 
+          <!-- Anotações Internas -->
+          <div class="card sec-card sec-card-tall">
+            <div class="card-header">
+              <h3>Anotações Internas</h3>
+              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
+            </div>
+            <div class="notas-list" id="notas-list">
+              <div class="empty-state">Nenhuma anotação.</div>
+            </div>
+          </div>
+
           <!-- Revisão de Longa Ausência -->
-          <div class="card sec-card sec-card-wide">
+          <div class="card sec-card">
             <div class="card-header">
               <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h3>Revisão de Longa Ausência</h3>
@@ -531,17 +542,6 @@
             </div>
             <div class="nf-list" id="inativacao-list">
               <div class="empty-state">Nenhuma sugestão de inativação.</div>
-            </div>
-          </div>
-
-          <!-- Anotações Internas -->
-          <div class="card sec-card sec-card-wide">
-            <div class="card-header">
-              <h3>Anotações Internas</h3>
-              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
-            </div>
-            <div class="notas-list" id="notas-list">
-              <div class="empty-state">Nenhuma anotação.</div>
             </div>
           </div>
 
