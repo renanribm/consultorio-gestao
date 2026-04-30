@@ -1464,7 +1464,7 @@ function renderRetornoAlert() {
   const banner = el('retorno-banner');
   if (banner) {
     if (semRetorno.length > 0) {
-      el('retorno-banner-text').textContent = `${semRetorno.length} paciente${semRetorno.length > 1 ? 's precisam' : ' precisa'} ser contatado${semRetorno.length > 1 ? 's' : ''} — sem consulta há mais de 30 dias sem agendamento futuro.`;
+      el('retorno-banner-text').textContent = `${semRetorno.length} paciente${semRetorno.length > 1 ? 's ativos' : ' ativo'} sem retorno agendado há mais de 30 dias.`;
       banner.classList.remove('hidden');
     } else {
       banner.classList.add('hidden');
