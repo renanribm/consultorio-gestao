@@ -142,8 +142,10 @@ button { cursor: pointer; border: none; background: none; }
   border: 1.5px solid var(--border); border-radius: var(--radius-sm);
   padding: 10px 12px; color: var(--text); background: var(--white);
   outline: none; transition: border-color var(--transition);
-  width: 100%; min-width: 0; box-sizing: border-box;
+  width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box;
+  display: block;
 }
+input[type="date"] { -webkit-appearance: none; appearance: none; }
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus { border-color: var(--primary); }
