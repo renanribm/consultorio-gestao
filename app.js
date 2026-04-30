@@ -7,7 +7,7 @@ import { initializeApp }                                      from 'https://www.
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc,
-         doc, query, orderBy, serverTimestamp, writeBatch, setDoc }
+         doc, query, orderBy, serverTimestamp, writeBatch, setDoc, deleteField }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -357,12 +357,19 @@ async function deleteRec(id) {
 }
 
 async function markReceived(id) {
+  const rec = S.data.recebimentos.find(r => r.id === id);
+  if (!rec) return;
+  const prevStatus = rec.status;
   showLoading();
   try {
     await updateDoc(doc(db, 'recebimentos', id), { status: 'pix', updatedAt: serverTimestamp() });
     await reloadCollection('recebimentos');
     updateBadges(); renderView(S.view);
-    showToast('Marcado como recebido via PIX!', 'success');
+    showToast('Marcado como recebido via PIX!', 'success', async () => {
+      await updateDoc(doc(db, 'recebimentos', id), { status: prevStatus, updatedAt: serverTimestamp() });
+      await reloadCollection('recebimentos');
+      updateBadges(); renderView(S.view);
+    });
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
@@ -1512,6 +1519,9 @@ el('form-nf').addEventListener('submit', async (e) => {
   e.preventDefault();
   const id  = el('nf-rec-id').value;
   const num = el('nf-numero').value.trim();
+  const rec = S.data.recebimentos.find(r => r.id === id);
+  const prevInvStatus = rec?.invoiceStatus || 'pendente';
+  const prevInvNum    = rec?.invoiceNumber || '';
   showLoading();
   try {
     await updateDoc(doc(db, 'recebimentos', id), {
@@ -1523,7 +1533,16 @@ el('form-nf').addEventListener('submit', async (e) => {
     updateBadges();
     closeModal('modal-nf');
     renderView(S.view);
-    showToast(`NF marcada como emitida${num?' — Nº '+num:''}!`, 'success');
+    showToast(`NF marcada como emitida${num?' — Nº '+num:''}!`, 'success', async () => {
+      await updateDoc(doc(db, 'recebimentos', id), {
+        invoiceStatus: prevInvStatus,
+        invoiceNumber: prevInvNum,
+        updatedAt: serverTimestamp()
+      });
+      await reloadCollection('recebimentos');
+      updateBadges();
+      renderView(S.view);
+    });
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 });
 
@@ -1639,14 +1658,12 @@ function renderInativacaoSugestoes() {
         <button class="btn btn-sm btn-outline" data-action="inativ-suggest" data-id="${p.patId}">Revisar</button>
       </div>
       <div class="inativacao-confirm hidden">
-        <div class="inativacao-confirm-status-row">
-          <select class="inativacao-status-sel" id="inativ-sel-${p.patId}">
-            <option value="alta">Alta — tratamento concluído</option>
-            <option value="inativo">Inativo — abandono/sem retorno</option>
-          </select>
+        <select class="inativacao-status-sel" id="inativ-sel-${p.patId}">
+          <option value="alta">Alta — tratamento concluído</option>
+          <option value="inativo">Inativo — abandono/sem retorno</option>
+        </select>
+        <div class="inativacao-confirm-actions">
           <button class="btn btn-sm btn-danger" data-action="inativ-confirm" data-id="${p.patId}">Confirmar</button>
-        </div>
-        <div class="inativacao-confirm-manter-row">
           <button class="btn btn-sm btn-outline" data-action="inativ-manter" data-id="${p.patId}">Manter ativo (+180 dias)</button>
           <button class="btn btn-sm btn-outline" data-action="inativ-cancel" data-id="${p.patId}">Cancelar</button>
         </div>
@@ -2480,6 +2497,7 @@ document.addEventListener('click', (e) => {
       const sel = el(`inativ-sel-${id}`);
       const novoStatus = sel ? sel.value : 'inativo';
       const label = novoStatus === 'alta' ? 'Alta' : 'Inativo';
+      const prevStatus = pac.status;
       showLoading();
       try {
         await updateDoc(doc(db, 'patients', id), { status: novoStatus, manuallyEdited: true, updatedAt: serverTimestamp() });
@@ -2487,7 +2505,13 @@ document.addEventListener('click', (e) => {
         updateBadges();
         renderInativacaoSugestoes();
         if (S.view === 'pacientes') renderPacientes();
-        showToast(`${pac.name} marcado(a) como ${label}.`, 'success');
+        showToast(`${pac.name} marcado(a) como ${label}.`, 'success', async () => {
+          await updateDoc(doc(db, 'patients', id), { status: prevStatus, updatedAt: serverTimestamp() });
+          await reloadCollection('patients');
+          updateBadges();
+          renderInativacaoSugestoes();
+          if (S.view === 'pacientes') renderPacientes();
+        });
       } catch (err) { handleErr(err); } finally { hideLoading(); }
     })();
   }
@@ -2495,13 +2519,22 @@ document.addEventListener('click', (e) => {
     (async () => {
       const pac = S.data.patients.find(p => p.id === id);
       if (!pac) return;
+      const prevManterAtivo = pac.manterAtivoDesde || null;
       showLoading();
       try {
         await updateDoc(doc(db, 'patients', id), { manterAtivoDesde: today(), updatedAt: serverTimestamp() });
         await reloadCollection('patients');
         updateBadges();
         renderInativacaoSugestoes();
-        showToast(`${pac.name} mantido(a) ativo(a) por mais 180 dias.`, 'success');
+        showToast(`${pac.name} mantido(a) ativo(a) por mais 180 dias.`, 'success', async () => {
+          await updateDoc(doc(db, 'patients', id), {
+            manterAtivoDesde: prevManterAtivo !== null ? prevManterAtivo : deleteField(),
+            updatedAt: serverTimestamp()
+          });
+          await reloadCollection('patients');
+          updateBadges();
+          renderInativacaoSugestoes();
+        });
       } catch (err) { handleErr(err); } finally { hideLoading(); }
     })();
   }
@@ -2584,18 +2617,46 @@ function patientStatusBadge(status) {
 }
 
 let toastTimer = null;
-function showToast(msg, type='success') {
-  const t=el('toast'), ic=el('toast-icon'), mg=el('toast-msg');
-  const icons={success:'✓',error:'✕',info:'ℹ'};
-  t.className=`toast toast-${type}`;
-  ic.textContent=icons[type]||'✓';
-  mg.textContent=msg;
-  t.classList.remove('hidden');
+let toastUndoFn = null;
+
+function showToast(msg, type = 'success', undoFn = null) {
+  const t = el('toast'), ic = el('toast-icon'), mg = el('toast-msg');
+  const undoBtn = el('toast-undo'), progress = el('toast-progress'), bar = el('toast-progress-bar');
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+
   clearTimeout(toastTimer);
-  toastTimer=setTimeout(()=>t.classList.add('hidden'),3500);
+  toastUndoFn = undoFn;
+
+  t.className = `toast toast-${type}`;
+  ic.textContent = icons[type] || '✓';
+  mg.textContent = msg;
+
+  if (undoFn) {
+    undoBtn.classList.remove('hidden');
+    progress.classList.remove('hidden');
+    bar.style.transition = 'none';
+    bar.style.width = '100%';
+    t.classList.remove('hidden');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      bar.style.transition = 'width 5s linear';
+      bar.style.width = '0%';
+    }));
+    toastTimer = setTimeout(() => { t.classList.add('hidden'); toastUndoFn = null; }, 5000);
+  } else {
+    undoBtn.classList.add('hidden');
+    progress.classList.add('hidden');
+    t.classList.remove('hidden');
+    toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
+  }
 }
 function showLoading()  { el('loading-overlay').classList.remove('hidden'); }
 function hideLoading()  { el('loading-overlay').classList.add('hidden'); }
+
+el('toast-undo').addEventListener('click', () => {
+  clearTimeout(toastTimer);
+  el('toast').classList.add('hidden');
+  if (toastUndoFn) { const fn = toastUndoFn; toastUndoFn = null; fn(); }
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BOOTSTRAP

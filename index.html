@@ -942,8 +942,14 @@
 
   <!-- ══ TOAST ══════════════════════════════════════════════════════════════ -->
   <div class="toast hidden" id="toast">
-    <span class="toast-icon" id="toast-icon"></span>
-    <span class="toast-msg" id="toast-msg"></span>
+    <div class="toast-body">
+      <span class="toast-icon" id="toast-icon"></span>
+      <span class="toast-msg" id="toast-msg"></span>
+      <button class="toast-undo hidden" id="toast-undo">Desfazer</button>
+    </div>
+    <div class="toast-progress hidden" id="toast-progress">
+      <div class="toast-progress-bar" id="toast-progress-bar"></div>
+    </div>
   </div>
 
   <!-- ══ LOADING ════════════════════════════════════════════════════════════ -->
