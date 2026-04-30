@@ -317,12 +317,12 @@ async function saveRecebimento(data, id = null) {
     else    { await addDoc(collection(db, 'recebimentos'), { ...data, createdAt: serverTimestamp(), createdBy: S.user.uid }); }
     await reloadCollection('recebimentos');
     updateBadges();
-    showToast('Recebimento salvo!', 'success');
+    showToast('Consulta salva!', 'success');
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
 async function deleteRec(id) {
-  if (!confirm('Excluir este recebimento?')) return;
+  if (!confirm('Excluir esta consulta?')) return;
   showLoading();
   try {
     await deleteDoc(doc(db, 'recebimentos', id));
@@ -1167,7 +1167,7 @@ function renderRecebimentos() {
 
 function openModalRec(rec = null) {
   S.editingRec = rec ? rec.id : null;
-  setText('modal-rec-title', rec ? 'Editar Recebimento' : 'Novo Recebimento');
+  setText('modal-rec-title', rec ? 'Editar Consulta' : 'Nova Consulta');
   el('rec-id').value          = rec ? rec.id : '';
   el('rec-data').value        = rec ? rec.date : today();
   el('rec-paciente').value    = rec ? (rec.patient || '') : '';
