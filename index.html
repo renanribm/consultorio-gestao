@@ -129,15 +129,16 @@
 
       <!-- Filter Bar -->
       <div class="filter-bar" id="filter-bar">
-        <div class="filter-presets" id="filter-presets">
-          <button class="filter-btn" data-period="semana">Esta semana</button>
-          <button class="filter-btn active" data-period="mes">Este mês</button>
-          <button class="filter-btn" data-period="mespassado">Mês passado</button>
-          <button class="filter-btn" data-period="3meses">3 meses</button>
-          <button class="filter-btn" data-period="6meses">6 meses</button>
-          <button class="filter-btn" data-period="ano">Este ano</button>
-          <button class="filter-btn" data-period="custom">Personalizado</button>
-        </div>
+        <select id="filter-select" class="filter-select">
+          <option value="semana">Esta semana</option>
+          <option value="mes" selected>Este mês</option>
+          <option value="proximomes">Próximo mês</option>
+          <option value="mespassado">Mês passado</option>
+          <option value="3meses">Últimos 3 meses</option>
+          <option value="6meses">Últimos 6 meses</option>
+          <option value="ano">Este ano</option>
+          <option value="custom">Personalizado…</option>
+        </select>
         <div class="filter-custom hidden" id="filter-custom">
           <input type="date" id="filter-start" aria-label="Data inicial">
           <span class="filter-sep">até</span>

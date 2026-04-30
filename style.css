@@ -233,10 +233,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
   background: var(--white); border-bottom: 1px solid var(--border);
   padding: 10px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; flex-shrink: 0;
 }
-.filter-presets { display: flex; gap: 4px; flex-wrap: wrap; }
-.filter-btn { padding: 5px 12px; border-radius: 20px; font-size: .8rem; font-weight: 600; color: var(--text-2); border: 1.5px solid var(--border); background: var(--white); transition: all var(--transition); }
-.filter-btn:hover { border-color: var(--primary); color: var(--primary); }
-.filter-btn.active { background: var(--primary); color: var(--white); border-color: var(--primary); }
+.filter-select { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; font-size: .82rem; font-weight: 600; color: var(--text); background: var(--white); outline: none; cursor: pointer; font-family: inherit; }
 .filter-custom { display: flex; align-items: center; gap: 8px; }
 .filter-custom input { border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 5px 10px; font-size: .82rem; color: var(--text); outline: none; }
 .filter-custom input:focus { border-color: var(--primary); }

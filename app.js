@@ -197,18 +197,14 @@ async function renderImportTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 // PERIOD FILTER
 // ─────────────────────────────────────────────────────────────────────────────
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const period = btn.dataset.period;
-    if (period === 'custom') {
-      el('filter-custom').classList.remove('hidden');
-    } else {
-      el('filter-custom').classList.add('hidden');
-      applyPreset(period);
-    }
-  });
+el('filter-select').addEventListener('change', () => {
+  const period = el('filter-select').value;
+  if (period === 'custom') {
+    el('filter-custom').classList.remove('hidden');
+  } else {
+    el('filter-custom').classList.add('hidden');
+    applyPreset(period);
+  }
 });
 
 el('btn-apply-filter').addEventListener('click', () => {
@@ -226,14 +222,17 @@ function applyPreset(preset) {
   const pad = n => String(n).padStart(2,'0');
   const ymd = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   let start, end;
-  if      (preset === 'semana')    { const dow = now.getDay(); start = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate()-dow)); end = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate()+(6-dow))); }
-  else if (preset === 'mes')       { start = ymd(new Date(now.getFullYear(), now.getMonth(), 1));    end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
-  else if (preset === 'mespassado'){ start = ymd(new Date(now.getFullYear(), now.getMonth()-1, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth(), 0)); }
-  else if (preset === '3meses')    { start = ymd(new Date(now.getFullYear(), now.getMonth()-2, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
-  else if (preset === '6meses')    { start = ymd(new Date(now.getFullYear(), now.getMonth()-5, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
-  else if (preset === 'ano')       { start = `${now.getFullYear()}-01-01`;                            end = `${now.getFullYear()}-12-31`; }
+  if      (preset === 'semana')     { const dow = now.getDay(); start = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate()-dow)); end = ymd(new Date(now.getFullYear(), now.getMonth(), now.getDate()+(6-dow))); }
+  else if (preset === 'mes')        { start = ymd(new Date(now.getFullYear(), now.getMonth(), 1));    end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
+  else if (preset === 'proximomes') { start = ymd(new Date(now.getFullYear(), now.getMonth()+1, 1)); end = ymd(new Date(now.getFullYear(), now.getMonth()+2, 0)); }
+  else if (preset === 'mespassado') { start = ymd(new Date(now.getFullYear(), now.getMonth()-1, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth(), 0)); }
+  else if (preset === '3meses')     { start = ymd(new Date(now.getFullYear(), now.getMonth()-2, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
+  else if (preset === '6meses')     { start = ymd(new Date(now.getFullYear(), now.getMonth()-5, 1));  end = ymd(new Date(now.getFullYear(), now.getMonth()+1, 0)); }
+  else if (preset === 'ano')        { start = `${now.getFullYear()}-01-01`;                            end = `${now.getFullYear()}-12-31`; }
   S.filter = { preset, start, end };
   el('filter-label').textContent = `${fmtDate(start)} → ${fmtDate(end)}`;
+  const sel = el('filter-select');
+  if (sel && sel.value !== preset) sel.value = preset;
   renderView(S.view);
 }
 
@@ -2133,8 +2132,12 @@ async function runImport() {
         const icPatId  = r.patient_id || '';
         const patDocId = icIdToDocId[icPatId] || null;
         if (!patDocId) {
-          const icName = icIdToIclinicName[icPatId] || icIdToName[icPatId] || icPatId;
-          results.unmatched.push({ date, name: icName, desc: (r.description || '').substring(0, 70) });
+          // Sem patient_id = bloqueio de agenda (slot vazio, aula, etc.) — ignorar silenciosamente
+          // Com patient_id mas sem match = divergência real — reportar para revisão
+          if (icPatId) {
+            const icName = icIdToIclinicName[icPatId] || icPatId;
+            results.unmatched.push({ date, name: icName, desc: (r.description || '').substring(0, 70) });
+          }
           continue;
         }
 
