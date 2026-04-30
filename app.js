@@ -40,6 +40,7 @@ const S = {
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
   retornoSort:     'asc',
+  paymentImportRows: null,
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2055,7 +2056,219 @@ function setProgress(pct, label) {
   el('import-progress-label').textContent = label;
 }
 
-// ── (importação CSV secretária removida — pagamentos lançados manualmente) ────
+// ─────────────────────────────────────────────────────────────────────────────
+// IMPORTAÇÃO ÚNICA — PLANILHA DE PAGAMENTOS
+// ─────────────────────────────────────────────────────────────────────────────
+el('payment-csv-input').addEventListener('change', () => {
+  const f = el('payment-csv-input').files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      S.paymentImportRows = parsePaymentCSV(e.target.result);
+      renderPaymentImportReview();
+    } catch (err) {
+      showToast('Erro ao processar arquivo: ' + (err.message || 'verifique o formato.'), 'error');
+    }
+  };
+  reader.readAsText(f, 'UTF-8');
+});
+
+el('btn-cancel-payment-import').addEventListener('click', resetPaymentImport);
+el('btn-confirm-payment-import').addEventListener('click', confirmPaymentImport);
+
+function resetPaymentImport() {
+  S.paymentImportRows = null;
+  el('payment-csv-input').value = '';
+  const reviewEl = el('payment-import-review');
+  reviewEl.classList.add('hidden');
+  reviewEl.innerHTML = '';
+  el('payment-import-actions').classList.add('hidden');
+  el('payment-import-result').classList.add('hidden');
+}
+
+function parsePaymentCSV(text) {
+  // Strip UTF-8 BOM if present (Excel exports often include it)
+  const clean = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const lines = clean.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+  if (lines.length < 2) throw new Error('Arquivo vazio ou sem dados.');
+  const headers = lines[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+  const rows = [];
+  for (let li = 1; li < lines.length; li++) {
+    const parts = lines[li].split(';').map(v => v.replace(/^"|"$/g, '').trim());
+    const obj = Object.fromEntries(headers.map((h, i) => [h, parts[i] || '']));
+    const rawDate = (obj['DATA CONSULTA'] || '').trim();
+    // Auto-correct known date typo: 12/12/2026 → 12/02/2026
+    const consultationDate = rawDate === '12/12/2026' ? '2026-02-12' : parseBRDate(rawDate);
+    if (!consultationDate) continue;
+    const meioBruto = (obj['MEIO'] || '').toLowerCase().trim();
+    const consultationType = meioBruto === 'online' ? 'teleconsulta' : 'presencial';
+    const pagLower = (obj['PAGAMENTO'] || '').trim().toLowerCase();
+    const nfLower  = (obj['NF ENVIADA'] || '').trim().toLowerCase();
+    let status, invoiceStatus;
+    if (pagLower === '-' || pagLower === '—') {
+      status = 'gratuito'; invoiceStatus = 'isenta';
+    } else if (pagLower === 'sim') {
+      status = 'pix'; invoiceStatus = nfLower === 'sim' ? 'emitida' : 'pendente';
+    } else {
+      status = 'pendente'; invoiceStatus = 'pendente';
+    }
+    const value = parseBRNumber(obj['VALOR'] || '0');
+    const rawPayDate = (obj['DATA PAGAMENTO'] || '').trim();
+    const paymentDate = rawPayDate ? parseBRDate(rawPayDate) : null;
+    const patientCsvName = (obj['PACIENTE'] || '').trim();
+    const matchedPatient = patientCsvName ? fuzzyMatchPatient(patientCsvName) : null;
+    rows.push({ idx: li, csvLine: li + 1, consultationDate, patientCsvName, consultationType, value, status, invoiceStatus, paymentDate: paymentDate || null, matchedPatient, manualPatientId: null });
+  }
+  return rows;
+}
+
+function fuzzyMatchPatient(csvName) {
+  const norm     = normalizeStr(csvName);
+  const csvWords = norm.split(/\s+/).filter(w => w.length > 1);
+  if (!csvWords.length) return null;
+  const csvFirst = csvWords[0];
+  const csvLast  = csvWords[csvWords.length - 1];
+  let best = null;
+  for (const p of S.data.patients) {
+    const pNorm  = normalizeStr(p.name || '');
+    if (pNorm === norm) return { id: p.id, name: p.name, score: 'exact' };
+    const pWords = pNorm.split(/\s+/).filter(w => w.length > 1);
+    if (!best && pWords[0] === csvFirst && (csvWords.length < 2 || pWords.includes(csvLast))) {
+      best = { id: p.id, name: p.name, score: 'fuzzy' };
+    }
+  }
+  return best;
+}
+
+function renderPaymentImportReview() {
+  const rows = S.paymentImportRows;
+  if (!rows || !rows.length) return;
+  const matched   = rows.filter(r => r.matchedPatient);
+  const unmatched = rows.filter(r => !r.matchedPatient);
+  const patientOptions = [...S.data.patients]
+    .sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' }))
+    .map(p => `<option value="${p.id}">${esc(p.name || '')}</option>`)
+    .join('');
+  let html = `<div class="payment-review-summary">
+    <div class="payment-summary-matched">✅ <strong>${matched.length}</strong> registro${matched.length !== 1 ? 's' : ''} identificado${matched.length !== 1 ? 's' : ''} automaticamente</div>
+    ${unmatched.length ? `<div class="payment-summary-unmatched">⚠️ <strong>${unmatched.length}</strong> registro${unmatched.length !== 1 ? 's' : ''} sem paciente identificado — selecione abaixo ou ignore</div>` : ''}
+  </div>`;
+  if (unmatched.length) {
+    html += `<div class="payment-unmatched-section">
+      <div class="payment-unmatched-title">Registros não identificados (${unmatched.length})</div>
+      <div class="payment-unmatched-list">`;
+    for (const row of unmatched) {
+      html += `<div class="payment-unmatched-row" data-row-idx="${row.idx}">
+        <div class="payment-row-meta">
+          <span class="payment-row-date">${fmtDate(row.consultationDate)}</span>
+          <span class="payment-row-csvname">${esc(row.patientCsvName)}</span>
+          <span class="payment-row-value">${fmtBRL(row.value)}</span>
+          ${statusBadge(row.status)}
+        </div>
+        <div class="payment-row-select-wrap">
+          <select class="payment-patient-select" data-row-idx="${row.idx}">
+            <option value="">— Ignorar esta linha —</option>
+            ${patientOptions}
+          </select>
+        </div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  html += `<details class="payment-matched-details">
+    <summary>Ver ${matched.length} registro${matched.length !== 1 ? 's' : ''} identificado${matched.length !== 1 ? 's' : ''} ▸</summary>
+    <div class="payment-matched-list">
+      <table class="data-table">
+        <thead><tr>
+          <th style="width:46px;color:var(--text-muted);font-size:.75rem">#</th>
+          <th>Data</th><th>Nome (CSV)</th><th>Paciente</th>
+          <th class="text-right">Valor</th><th>Status</th>
+        </tr></thead>
+        <tbody>${matched.map(r => `<tr>
+          <td style="color:var(--text-muted);font-size:.75rem">${r.csvLine}</td>
+          <td>${fmtDate(r.consultationDate)}</td>
+          <td style="color:var(--text-muted);font-size:.8rem">${esc(r.patientCsvName)}</td>
+          <td style="font-weight:600">${esc(r.matchedPatient.name)}</td>
+          <td class="text-right">${fmtBRL(r.value)}</td>
+          <td>${statusBadge(r.status)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  </details>`;
+  const reviewEl = el('payment-import-review');
+  reviewEl.innerHTML = html;
+  reviewEl.classList.remove('hidden');
+  reviewEl.querySelectorAll('.payment-patient-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const row = S.paymentImportRows.find(r => r.idx === parseInt(sel.dataset.rowIdx));
+      if (row) row.manualPatientId = sel.value || null;
+      updatePaymentImportSummary();
+    });
+  });
+  updatePaymentImportSummary();
+  el('payment-import-actions').classList.remove('hidden');
+}
+
+function updatePaymentImportSummary() {
+  const rows = S.paymentImportRows;
+  if (!rows) return;
+  const ready   = rows.filter(r => r.matchedPatient || r.manualPatientId).length;
+  const ignored = rows.length - ready;
+  el('payment-import-summary').textContent =
+    `${ready} de ${rows.length} prontos · ${ignored} ${ignored === 1 ? 'será ignorado' : 'serão ignorados'}`;
+}
+
+async function confirmPaymentImport() {
+  const rows = S.paymentImportRows;
+  if (!rows) return;
+  const toImport = rows.filter(r => r.matchedPatient || r.manualPatientId);
+  if (!toImport.length) { showToast('Nenhum registro pronto para importar.', 'error'); return; }
+  const dups = toImport.filter(row => {
+    const patId = row.manualPatientId || row.matchedPatient?.id;
+    return S.data.recebimentos.some(r => r.patientId === patId && r.date === row.consultationDate);
+  });
+  if (dups.length) {
+    if (!confirm(`${dups.length} registro${dups.length > 1 ? 's' : ''} já exist${dups.length > 1 ? 'em' : 'e'} no sistema (mesmo paciente e data). Continuar mesmo assim?`)) return;
+  }
+  if (!confirm(`Importar ${toImport.length} registro${toImport.length > 1 ? 's' : ''} de consulta?`)) return;
+  showLoading();
+  try {
+    for (let i = 0; i < toImport.length; i += 490) {
+      const batch = writeBatch(db);
+      toImport.slice(i, i + 490).forEach(row => {
+        const patId   = row.manualPatientId || row.matchedPatient?.id || null;
+        const patName = patId ? (S.data.patients.find(p => p.id === patId)?.name || row.patientCsvName) : row.patientCsvName;
+        const data = {
+          date:             row.consultationDate,
+          patient:          patName,
+          patientId:        patId,
+          consultationType: row.consultationType,
+          value:            row.value,
+          status:           row.status,
+          invoiceStatus:    row.invoiceStatus,
+          notes:            '',
+          importedFromCsv:  true,
+          createdAt:        serverTimestamp(),
+          createdBy:        S.user.uid,
+        };
+        if (row.paymentDate) data.paymentDate = row.paymentDate;
+        batch.set(doc(collection(db, 'recebimentos')), data);
+      });
+      await batch.commit();
+    }
+    await reloadCollection('recebimentos');
+    updateBadges();
+    const resultEl = el('payment-import-result');
+    resultEl.className = 'import-result success';
+    resultEl.innerHTML = `<strong>✓ ${toImport.length} consulta${toImport.length > 1 ? 's importadas' : ' importada'} com sucesso!</strong><br>Os dados estão disponíveis na aba <strong>Consultas</strong>.`;
+    resultEl.classList.remove('hidden');
+    el('payment-import-review').classList.add('hidden');
+    el('payment-import-actions').classList.add('hidden');
+    S.paymentImportRows = null;
+    showToast(`${toImport.length} consulta${toImport.length > 1 ? 's' : ''} importada${toImport.length > 1 ? 's' : ''}!`, 'success');
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
+}
 
 
 function parseCSV(text) {

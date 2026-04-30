@@ -794,4 +794,102 @@ input[type="checkbox"].row-check {
 
   /* Toast: full-width at bottom */
   .toast { left: 12px; right: 12px; bottom: 12px; min-width: 0; }
+
+  /* Payment import: stack on mobile */
+  .payment-unmatched-row { flex-direction: column; align-items: flex-start; }
+  .payment-patient-select { min-width: 0; width: 100%; max-width: 100%; }
 }
+
+/* ============================================================
+   PAYMENT IMPORT REVIEW
+   ============================================================ */
+.payment-import-review { margin-top: 1rem; }
+
+.payment-review-summary { display: flex; flex-direction: column; gap: 8px; margin-bottom: 1rem; }
+.payment-summary-matched {
+  padding: 10px 14px;
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  font-size: .875rem;
+  color: #15803d;
+}
+.payment-summary-unmatched {
+  padding: 10px 14px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: 8px;
+  font-size: .875rem;
+  color: #92400e;
+}
+
+.payment-unmatched-section { margin-bottom: 1rem; }
+.payment-unmatched-title {
+  font-weight: 600;
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.payment-unmatched-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 380px;
+  overflow-y: auto;
+}
+.payment-unmatched-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+.payment-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.payment-row-date   { font-size: .78rem; color: var(--text-muted); flex-shrink: 0; }
+.payment-row-csvname{ font-weight: 600; font-size: .875rem; }
+.payment-row-value  { font-size: .875rem; font-weight: 500; color: var(--text-2); flex-shrink: 0; }
+.payment-row-select-wrap { flex-shrink: 0; }
+.payment-patient-select {
+  font-size: .8rem;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  min-width: 220px;
+  max-width: 280px;
+  color: var(--text);
+}
+
+.payment-matched-details {
+  margin-top: 1rem;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.payment-matched-details > summary {
+  cursor: pointer;
+  padding: 10px 16px;
+  font-size: .875rem;
+  color: var(--text-muted);
+  user-select: none;
+  background: var(--primary-faint);
+  list-style: none;
+}
+.payment-matched-details > summary:hover { background: var(--primary-pale); }
+.payment-matched-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.payment-matched-list .data-table { border-radius: 0; }

@@ -628,6 +628,33 @@
           </button>
           <div id="reset-result" class="import-result hidden" style="margin-top:1rem"></div>
         </div>
+
+        <!-- ── IMPORTAÇÃO ÚNICA: PLANILHA DE PAGAMENTOS ──────────────────── -->
+        <div class="card import-card" style="margin-top:1.5rem;border-left:4px solid var(--primary)">
+          <div class="import-instructions">
+            <h3>Importação única — Planilha de Pagamentos</h3>
+            <p>Importa dados históricos de pagamentos (set/2025 em diante) a partir do CSV da secretária. <strong>Esta operação é pontual — não repetir após a importação inicial.</strong></p>
+            <ol>
+              <li>Selecione o arquivo CSV com os dados de pagamento</li>
+              <li>Revise os registros e vincule os pacientes não identificados automaticamente</li>
+              <li>Clique em <strong>Confirmar Importação</strong> para gravar no sistema</li>
+            </ol>
+          </div>
+          <label class="upload-area" id="payment-upload-area">
+            <input type="file" id="payment-csv-input" accept=".csv" class="hidden">
+            <div class="upload-icon">📋</div>
+            <div class="upload-text">Clique para selecionar o CSV de pagamentos</div>
+            <div class="upload-sub">Formato: DATA CONSULTA · PACIENTE · MEIO · VALOR · PAGAMENTO · NF ENVIADA · DATA PAGAMENTO</div>
+          </label>
+          <div id="payment-import-review" class="payment-import-review hidden"></div>
+          <div class="import-actions-bar hidden" id="payment-import-actions">
+            <button class="btn btn-outline" id="btn-cancel-payment-import">Cancelar</button>
+            <span id="payment-import-summary" style="font-size:.85rem;color:var(--text-muted)"></span>
+            <button class="btn btn-primary" id="btn-confirm-payment-import" style="margin-left:auto">Confirmar Importação</button>
+          </div>
+          <div id="payment-import-result" class="import-result hidden" style="margin-top:1rem"></div>
+        </div>
+
       </section>
 
     </main>
