@@ -275,6 +275,34 @@ function updateBadges() {
   const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
   setCount('badge-inadimplencia', pendRec.length);
   setCount('badge-nf', pendNF.length);
+  setCount('badge-inativacao', calcInativacaoSugestoes().length);
+}
+
+function calcInativacaoSugestoes() {
+  const todayStr = today();
+  const DIAS = 180;
+  const completedStatuses = new Set(['cp', 'at', 'co']);
+  const patLastConsult = {};
+  S.data.consultations.forEach(c => {
+    if (!c.patientId || !c.date || c.date > todayStr) return;
+    if (!completedStatuses.has(c.status)) return;
+    if (!patLastConsult[c.patientId] || c.date > patLastConsult[c.patientId])
+      patLastConsult[c.patientId] = c.date;
+  });
+  const cutoff = new Date(todayStr);
+  cutoff.setDate(cutoff.getDate() - DIAS);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+  return Object.entries(patLastConsult)
+    .filter(([patId, lastDate]) => {
+      if (lastDate > cutoffStr) return false;
+      const pac = S.data.patients.find(p => p.id === patId);
+      return pac && pac.status === 'ativo';
+    })
+    .map(([patId, lastDate]) => {
+      const pac = S.data.patients.find(p => p.id === patId);
+      return { patId, lastDate, name: pac?.name || '—' };
+    })
+    .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
 }
 
 function setCount(id, n) {
@@ -1382,6 +1410,7 @@ el('form-nf').addEventListener('submit', async (e) => {
 function renderSecretaria() {
   renderNFPendentes();
   renderRetornoAlert();
+  renderInativacaoSugestoes();
   renderNotas();
   if (!el('r-data').value) el('r-data').value = today();
 }
@@ -1455,6 +1484,39 @@ function renderRetornoAlert() {
       <div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)}</div>
       <div class="retorno-item-meta">${daysBetween(p.lastDate, todayStr)} dias sem retorno</div>
       ${p.phone ? `<div class="retorno-item-phone">${esc(p.phone)}</div>` : ''}
+    </div>`).join('');
+}
+
+function renderInativacaoSugestoes() {
+  const container = el('inativacao-list');
+  if (!container) return;
+  const todayStr = today();
+  const lista = calcInativacaoSugestoes();
+  const pill = el('inativacao-count-pill');
+  if (pill) pill.textContent = lista.length;
+  setCount('badge-inativacao', lista.length);
+  if (!lista.length) {
+    container.innerHTML = '<div class="empty-state">Nenhuma sugestão de inativação.</div>';
+    return;
+  }
+  container.innerHTML = lista.map(p => `
+    <div class="inativacao-item" id="inativ-row-${p.patId}">
+      <div class="inativacao-item-info">
+        <div class="inativacao-item-name">
+          <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
+        </div>
+        <div class="inativacao-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${daysBetween(p.lastDate, todayStr)} dias</div>
+      </div>
+      <div class="inativacao-item-actions">
+        <button class="btn btn-sm btn-outline" data-action="inativ-suggest" data-id="${p.patId}">Marcar como inativo</button>
+      </div>
+      <div class="inativacao-confirm hidden">
+        <span class="inativacao-confirm-text">Tem certeza? Esta ação pode ser desfeita no cadastro.</span>
+        <div class="inativacao-confirm-btns">
+          <button class="btn btn-sm btn-danger" data-action="inativ-confirm" data-id="${p.patId}">Confirmar</button>
+          <button class="btn btn-sm btn-outline" data-action="inativ-cancel" data-id="${p.patId}">Cancelar</button>
+        </div>
+      </div>
     </div>`).join('');
 }
 
@@ -2025,6 +2087,29 @@ document.addEventListener('click', (e) => {
   else if (action === 'view-pac')       { navigateToPatient(id); }
   else if (action === 'cal-select-day') { selectCalendarDay(btn.dataset.date); }
   else if (action === 'merge-pac')      { mergePacientes(btn.dataset.keep, btn.dataset.drop); }
+  else if (action === 'inativ-suggest') {
+    const row = el(`inativ-row-${id}`);
+    if (row) { row.querySelector('.inativacao-item-actions').classList.add('hidden'); row.querySelector('.inativacao-confirm').classList.remove('hidden'); }
+  }
+  else if (action === 'inativ-cancel') {
+    const row = el(`inativ-row-${id}`);
+    if (row) { row.querySelector('.inativacao-item-actions').classList.remove('hidden'); row.querySelector('.inativacao-confirm').classList.add('hidden'); }
+  }
+  else if (action === 'inativ-confirm') {
+    (async () => {
+      const pac = S.data.patients.find(p => p.id === id);
+      if (!pac) return;
+      showLoading();
+      try {
+        await updateDoc(doc(db, 'patients', id), { status: 'inativo', manuallyEdited: true, updatedAt: serverTimestamp() });
+        await reloadCollection('patients');
+        updateBadges();
+        renderInativacaoSugestoes();
+        if (S.view === 'pacientes') renderPacientes();
+        showToast(`${pac.name} marcado(a) como inativo(a).`, 'success');
+      } catch (err) { handleErr(err); } finally { hideLoading(); }
+    })();
+  }
 });
 
 el('sidebar-toggle').addEventListener('click', () => el('sidebar').classList.toggle('collapsed'));
