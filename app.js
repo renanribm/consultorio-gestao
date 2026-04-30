@@ -882,14 +882,18 @@ function renderCalendarDetail(dateStr) {
       ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>`
       : '';
 
-    items.push(`<div class="cal-detail-item">
+    const clickable = !isBlock && e.id;
+    items.push(`<div class="cal-detail-item${clickable ? ' cal-detail-item-clickable' : ''}" ${clickable ? `data-action="open-consult-detail" data-id="${e.id}"` : ''}>
       ${timeRange}
       <div class="cal-detail-dot ${dotCls}" style="flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;color:var(--text)">${nameEl}</div>
         ${subLine}${notesLine}
       </div>
-      <div style="text-align:right;flex-shrink:0;font-weight:700;color:var(--text)">${(!isBlock && e.value) ? fmtBRL(e.value) : ''}</div>
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+        ${(!isBlock && e.value) ? `<span style="font-weight:700;color:var(--text)">${fmtBRL(e.value)}</span>` : ''}
+        ${clickable ? `<svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14" style="color:var(--text-muted);flex-shrink:0"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>` : ''}
+      </div>
     </div>`);
   }
 
@@ -1165,19 +1169,64 @@ function renderRecebimentos() {
   }).join('');
 }
 
-function openModalRec(rec = null) {
+function openModalRec(rec = null, prefill = null) {
   S.editingRec = rec ? rec.id : null;
   setText('modal-rec-title', rec ? 'Editar Consulta' : 'Nova Consulta');
   el('rec-id').value          = rec ? rec.id : '';
-  el('rec-data').value        = rec ? rec.date : today();
-  el('rec-paciente').value    = rec ? (rec.patient || '') : '';
-  el('rec-paciente-id').value = rec ? (rec.patientId || '') : '';
-  el('rec-tipo').value        = rec ? (rec.consultationType || '') : '';
+  el('rec-data').value        = rec ? rec.date        : (prefill?.date || today());
+  el('rec-paciente').value    = rec ? (rec.patient||'') : (prefill?.patientName || '');
+  el('rec-paciente-id').value = rec ? (rec.patientId||'') : (prefill?.patientId || '');
+  el('rec-tipo').value        = rec ? (rec.consultationType||'') : (prefill?.consultationType || '');
   el('rec-valor').value       = rec ? (rec.value || '') : '';
   el('rec-status').value      = rec ? (rec.status || '') : '';
   el('rec-nf').value          = rec ? (rec.invoiceStatus || 'pendente') : 'pendente';
   el('rec-obs').value         = rec ? (rec.notes || '') : '';
   openModal('modal-rec');
+}
+
+function openConsultDetail(eventId) {
+  const ev = S.data.consultations.find(c => c.id === eventId);
+  if (!ev) return;
+
+  const [y, m, d] = ev.date.split('-');
+  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online' };
+  const fmtTime = t => t || '—';
+
+  setText('cd-patient-name', ev.patientName || '—');
+  setText('cd-date', `${parseInt(d)}/${parseInt(m)}/${y}`);
+
+  // Seção 1 — iClinic
+  const timeStr = ev.startTime ? `${fmtTime(ev.startTime)}${ev.endTime ? ' – '+fmtTime(ev.endTime) : ''}` : null;
+  el('cd-iclinic').innerHTML = `
+    <div class="cd-row"><span class="cd-label">Status</span><span>${statusLabels[ev.status] || ev.status || '—'}</span></div>
+    ${timeStr ? `<div class="cd-row"><span class="cd-label">Horário</span><span>${esc(timeStr)}</span></div>` : ''}
+    ${ev.consultationType ? `<div class="cd-row"><span class="cd-label">Tipo</span><span>${labels.consultationType[ev.consultationType] || ev.consultationType}</span></div>` : ''}
+    ${ev.notes ? `<div class="cd-row"><span class="cd-label">Obs.</span><span style="color:var(--text-muted)">${esc(ev.notes)}</span></div>` : ''}
+    ${ev.patientId ? `<div class="cd-row"><span class="cd-label"></span><span><span class="patient-link" data-patient="${ev.patientId}" style="font-size:.8rem">Ver cadastro do paciente →</span></span></div>` : ''}
+  `;
+
+  // Seção 2 — Financeiro
+  const recs = S.data.recebimentos.filter(r => r.patientId === ev.patientId && r.date === ev.date);
+  if (recs.length) {
+    el('cd-financial').innerHTML = recs.map(r => `
+      <div class="cd-rec-block">
+        <div class="cd-row"><span class="cd-label">Valor</span><span style="font-weight:700">${fmtBRL(r.value || 0)}</span></div>
+        <div class="cd-row"><span class="cd-label">Pagamento</span><span>${statusBadge(r.status)}</span></div>
+        <div class="cd-row"><span class="cd-label">Nota Fiscal</span><span>${nfBadge(r.invoiceStatus)}${r.invoiceNumber ? ` <span style="font-size:.75rem;color:var(--text-muted)">NF ${esc(r.invoiceNumber)}</span>` : ''}</span></div>
+        ${r.notes ? `<div class="cd-row"><span class="cd-label">Obs.</span><span style="color:var(--text-muted)">${esc(r.notes)}</span></div>` : ''}
+        <div class="cd-actions">
+          <button class="btn btn-sm btn-outline" data-action="cd-edit-rec" data-id="${r.id}">Editar lançamento</button>
+        </div>
+      </div>`).join('');
+  } else {
+    el('cd-financial').innerHTML = `
+      <div class="empty-state" style="padding:16px 0">Nenhum lançamento registrado para esta data.</div>
+      <div class="cd-actions">
+        <button class="btn btn-sm btn-primary" data-action="cd-register-payment" data-event-id="${ev.id}">+ Registrar pagamento</button>
+      </div>`;
+  }
+
+  openModal('modal-consult-detail');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2132,8 +2181,17 @@ document.addEventListener('click', (e) => {
   else if (action === 'edit-pac')       { const p = S.data.patients.find(p=>p.id===id); if(p) openModalPaciente(p); }
   else if (action === 'del-pac')        { deletePatient(id); }
   else if (action === 'view-pac')       { navigateToPatient(id); }
-  else if (action === 'cal-select-day') { selectCalendarDay(btn.dataset.date); }
-  else if (action === 'merge-pac')      { mergePacientes(btn.dataset.keep, btn.dataset.drop); }
+  else if (action === 'cal-select-day')      { selectCalendarDay(btn.dataset.date); }
+  else if (action === 'merge-pac')           { mergePacientes(btn.dataset.keep, btn.dataset.drop); }
+  else if (action === 'open-consult-detail') { openConsultDetail(id); }
+  else if (action === 'cd-edit-rec') {
+    const r = S.data.recebimentos.find(r => r.id === id);
+    if (r) { closeModal('modal-consult-detail'); openModalRec(r); }
+  }
+  else if (action === 'cd-register-payment') {
+    const ev = S.data.consultations.find(c => c.id === btn.dataset.eventId);
+    if (ev) { closeModal('modal-consult-detail'); openModalRec(null, { date: ev.date, patientName: ev.patientName, patientId: ev.patientId, consultationType: ev.consultationType }); }
+  }
   else if (action === 'inativ-suggest') {
     const row = el(`inativ-row-${id}`);
     if (row) { row.querySelector('.inativacao-item-actions').classList.add('hidden'); row.querySelector('.inativacao-confirm').classList.remove('hidden'); }

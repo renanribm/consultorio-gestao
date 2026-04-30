@@ -633,6 +633,29 @@
     </main>
   </div>
 
+  <!-- ══ MODAL: DETALHE DA CONSULTA (calendário) ═══════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-consult-detail">
+    <div class="modal" style="max-width:480px">
+      <div class="modal-header">
+        <div>
+          <h3 id="cd-patient-name">—</h3>
+          <p class="modal-subtitle" id="cd-date">—</p>
+        </div>
+        <button class="modal-close-btn" data-close="modal-consult-detail">✕</button>
+      </div>
+      <!-- Seção 1: Agendamento -->
+      <div class="cd-section">
+        <div class="cd-section-title">Agendamento (iClinic)</div>
+        <div id="cd-iclinic"></div>
+      </div>
+      <!-- Seção 2: Financeiro -->
+      <div class="cd-section">
+        <div class="cd-section-title">Financeiro</div>
+        <div id="cd-financial"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══ MODAL: RECEBIMENTO ════════════════════════════════════════════════ -->
   <div class="modal-overlay hidden" id="modal-rec">
     <div class="modal">
