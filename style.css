@@ -174,7 +174,7 @@ input[type="date"] { -webkit-appearance: none; appearance: none; }
 /* ============================================================
    APP SHELL
    ============================================================ */
-.app-shell { display: flex; height: 100vh; overflow: hidden; }
+.app-shell { display: flex; height: 100vh; height: 100dvh; overflow: hidden; }
 
 /* ── Sidebar ─────────────────────────────────────────── */
 .sidebar {
