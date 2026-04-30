@@ -40,6 +40,7 @@ const S = {
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
   retornoSort:     'asc',
+  inativacaoSort:  'asc',
   paymentImportRows: null,
 };
 
@@ -293,7 +294,7 @@ function handleErr(err) {
 function updateBadges() {
   const todayStr = today();
   const pendRec = S.data.recebimentos.filter(r => r.status === 'pendente' && r.date <= todayStr);
-  const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
+  const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayStr);
   setCount('badge-inadimplencia', pendRec.length);
   setCount('badge-nf', pendNF.length);
   setCount('badge-inativacao', calcInativacaoSugestoes().length);
@@ -327,7 +328,7 @@ function calcInativacaoSugestoes() {
       const pac = S.data.patients.find(p => p.id === patId);
       return { patId, lastDate, name: pac?.name || '—', manterAtivoDesde: pac?.manterAtivoDesde || null };
     })
-    .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
+    ;
 }
 
 function setCount(id, n) {
@@ -619,7 +620,7 @@ function renderDashboard() {
   setText('kpi-gratuito',     gratuitos);
   setText('kpi-ticket',       fmtBRL(ticket));
 
-  const pendNF = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
+  const pendNF = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= today());
   const alertEl = el('alert-nf');
   alertEl.classList.toggle('hidden', pendNF.length === 0);
   if (pendNF.length) setText('alert-nf-count', `${pendNF.length} nota${pendNF.length>1?'s fiscais':' fiscal'}`);
@@ -1449,9 +1450,16 @@ el('btn-retorno-sort').addEventListener('click', () => {
   renderRetornoAlert();
 });
 
+el('btn-inativacao-sort').addEventListener('click', () => {
+  S.inativacaoSort = S.inativacaoSort === 'asc' ? 'desc' : 'asc';
+  el('btn-inativacao-sort').textContent = S.inativacaoSort === 'asc' ? 'Mais antigos primeiro ↑' : 'Mais recentes primeiro ↓';
+  renderInativacaoSugestoes();
+});
+
 // NF bulk selection
 el('check-nf-all').addEventListener('change', (e) => {
-  const pendNF = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
+  const todayNF2 = today();
+  const pendNF = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayNF2);
   if (e.target.checked) pendNF.forEach(r => S.nfSelected.add(r.id));
   else S.nfSelected.clear();
   renderNFPendentes();
@@ -1632,7 +1640,10 @@ function renderInativacaoSugestoes() {
   const container = el('inativacao-list');
   if (!container) return;
   const todayStr = today();
-  const lista = calcInativacaoSugestoes();
+  const lista = calcInativacaoSugestoes()
+    .sort((a, b) => S.inativacaoSort === 'asc'
+      ? a.lastDate.localeCompare(b.lastDate)
+      : b.lastDate.localeCompare(a.lastDate));
   const pill = el('inativacao-count-pill');
   if (pill) pill.textContent = lista.length;
   setCount('badge-inativacao', lista.length);
@@ -1675,8 +1686,9 @@ function renderInativacaoSugestoes() {
 }
 
 function renderNFPendentes() {
+  const todayNF = today();
   const pendNF = S.data.recebimentos
-    .filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito')
+    .filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayNF)
     .sort((a,b) => a.date.localeCompare(b.date));
 
   el('nf-count-pill').textContent = pendNF.length;
@@ -1715,7 +1727,7 @@ function renderNFPendentes() {
 }
 
 function updateNFToolbar() {
-  const pendNF   = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito');
+  const pendNF   = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= today());
   const total    = pendNF.length;
   const selCount = S.nfSelected.size;
   const allCheck = el('check-nf-all');
