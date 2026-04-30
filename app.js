@@ -697,6 +697,42 @@ el('btn-cal-close-detail').addEventListener('click', () => {
   document.querySelectorAll('.cal-day.selected').forEach(d => d.classList.remove('selected'));
 });
 
+function getHolidays(year) {
+  function easter(y) {
+    const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4;
+    const f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+    const h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4;
+    const l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+    return new Date(y,Math.floor((h+l-7*m+114)/31)-1,((h+l-7*m+114)%31)+1);
+  }
+  function add(d,n){const r=new Date(d);r.setDate(r.getDate()+n);return r;}
+  function fmt(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+  const map={};
+  const put=(date,name,type)=>{map[fmt(date)]={name,type};};
+  // Nacionais fixos
+  put(new Date(year,0,1),  'Confraternização Universal','nacional');
+  put(new Date(year,3,21), 'Tiradentes','nacional');
+  put(new Date(year,4,1),  'Dia do Trabalho','nacional');
+  put(new Date(year,8,7),  'Independência do Brasil','nacional');
+  put(new Date(year,9,12), 'N. Sra. Aparecida','nacional');
+  put(new Date(year,10,2), 'Finados','nacional');
+  put(new Date(year,10,15),'Proclamação da República','nacional');
+  put(new Date(year,10,20),'Consciência Negra','nacional');
+  put(new Date(year,11,25),'Natal','nacional');
+  // Estadual SP
+  put(new Date(year,6,9),  'Revolução Constitucionalista','estadual');
+  // Municipal SP
+  put(new Date(year,0,25), 'Aniversário de SP','municipal');
+  // Móveis (Páscoa)
+  const e=easter(year);
+  put(add(e,-48),'Carnaval (2ª)','facultativo');
+  put(add(e,-47),'Carnaval (3ª)','facultativo');
+  put(add(e,-2), 'Sexta-feira Santa','nacional');
+  put(e,         'Páscoa','nacional');
+  put(add(e,60), 'Corpus Christi','nacional');
+  return map;
+}
+
 function renderAgenda() {
   const year  = S.calendarYear;
   const month = S.calendarMonth;
@@ -718,6 +754,7 @@ function renderAgenda() {
   const prevLast    = new Date(year, month, 0).getDate();
   const todayStr    = today();
   const statusOrder = ['cp','at','co','sc','re','na'];
+  const holidays    = getHolidays(year);
 
   let cells = '';
   let count = 0;
@@ -746,9 +783,11 @@ function renderAgenda() {
       return `<div class="cal-chip ${chipCls}" title="${esc(chipTitle)}"><span class="chip-desktop">${esc(chipFull)}</span><span class="chip-mobile">${esc(chipShort)}</span></div>`;
     }).join('');
     const more = events.length > 3 ? `<div class="cal-chip cal-chip-more">+${events.length - 3}</div>` : '';
+    const hol  = holidays[dateStr];
+    const holHtml = hol ? `<div class="cal-holiday cal-holiday-${hol.type}" title="${esc(hol.name)}">${esc(hol.name)}</div>` : '';
 
     cells += `<div class="cal-day${isToday?' today':''}${isSel?' selected':''}" data-date="${dateStr}" data-action="cal-select-day">
-      <div class="cal-day-num">${d}</div>${chips}${more}
+      <div class="cal-day-num">${d}</div>${holHtml}${chips}${more}
     </div>`;
     count++;
   }
@@ -791,10 +830,18 @@ function renderCalendarDetail(dateStr) {
   const patientCount = events.filter(e => e.iclinicPatientId || e.patientId).length;
   setText('cal-detail-title', `${parseInt(d)}/${parseInt(m)}/${y} — ${patientCount} consulta${patientCount !== 1 ? 's' : ''}`);
 
+  const hol = getHolidays(parseInt(y))[dateStr];
+  const detailList = el('cal-detail-list');
+  const holBanner = hol
+    ? `<div class="cal-detail-holiday cal-detail-holiday-${hol.type}">
+        <span>🗓</span><span>${esc(hol.name)}</span>
+       </div>`
+    : '';
+
   const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online' };
 
   if (events.length === 0) {
-    el('cal-detail-list').innerHTML = '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>';
+    detailList.innerHTML = holBanner + '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>';
     el('calendar-detail').classList.remove('hidden');
     return;
   }
@@ -846,7 +893,7 @@ function renderCalendarDetail(dateStr) {
     </div>`);
   }
 
-  el('cal-detail-list').innerHTML = items.join('');
+  detailList.innerHTML = holBanner + items.join('');
   el('calendar-detail').classList.remove('hidden');
 }
 
