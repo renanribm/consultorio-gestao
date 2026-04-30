@@ -376,7 +376,10 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .inativacao-item-name { font-weight: 600; color: var(--text); font-size: .86rem; margin-bottom: 2px; }
 .inativacao-item-meta { color: var(--text-muted); font-size: .75rem; }
 .inativacao-item-actions { flex-shrink: 0; }
-.inativacao-confirm { display: flex; flex-direction: column; gap: 6px; width: 100%; background: var(--red-bg); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 4px; }
+.inativacao-confirm { display: flex; flex-direction: column; gap: 8px; width: 100%; background: var(--primary-faint); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 4px; }
+.inativacao-confirm-status-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.inativacao-confirm-manter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border-top: 1px solid var(--border-light); padding-top: 8px; }
+.inativacao-status-sel { font-size: .8rem; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff; flex: 1; min-width: 180px; }
 .inativacao-confirm-text { font-size: .82rem; color: #991b1b; font-weight: 600; }
 .inativacao-confirm-btns { display: flex; gap: 8px; }
 .btn-danger { background: #991b1b; color: var(--white); border: none; }
@@ -893,3 +896,19 @@ input[type="checkbox"].row-check {
   overflow-y: auto;
 }
 .payment-matched-list .data-table { border-radius: 0; }
+
+/* ── Import last info banner ── */
+.import-last-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 14px;
+  background: var(--primary-faint);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 1.25rem;
+  font-size: .82rem;
+  color: var(--text-2);
+}
+.import-last-info strong { color: var(--text); }
+.import-last-info-empty { color: var(--text-muted); font-style: italic; }

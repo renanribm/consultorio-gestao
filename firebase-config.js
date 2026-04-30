@@ -55,7 +55,8 @@ export const labels = {
   },
   patientStatus: {
     ativo:  "Ativo",
-    inativo:"Inativo"
+    inativo:"Inativo",
+    alta:   "Alta"
   },
   gender: {
     m: "Masculino",

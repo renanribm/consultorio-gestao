@@ -6,8 +6,8 @@ import { firebaseConfig, userRoles, labels } from './firebase-config.js';
 import { initializeApp }                                      from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc,
-         doc, query, orderBy, serverTimestamp, writeBatch }
+import { getFirestore, collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc,
+         doc, query, orderBy, serverTimestamp, writeBatch, setDoc }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -171,7 +171,26 @@ function renderView(view) {
     case 'secretaria':   renderSecretaria();   break;
     case 'dre':          renderDRE();          break;
     case 'agenda':       renderAgenda();       break;
+    case 'import':       renderImportTab();    break;
   }
+}
+
+async function renderImportTab() {
+  const infoEl = el('import-last-info');
+  if (!infoEl) return;
+  try {
+    const snap = await getDoc(doc(db, 'metadata', 'lastImport'));
+    if (snap.exists()) {
+      const d = snap.data();
+      const ts = d.timestamp ? fmtTimestamp(d.timestamp) : '—';
+      infoEl.innerHTML = `<div class="import-last-info">
+        <span>Última importação: <strong>${ts}</strong> · <strong>${esc(d.userEmail || '—')}</strong></span>
+        <span>👤 ${d.patientsAdded||0} adicionados · ${d.patientsUpdated||0} atualizados · ${d.patientsSkipped||0} preservados &nbsp;|&nbsp; 📅 ${d.eventsAdded||0} adicionados · ${d.eventsUpdated||0} atualizados</span>
+      </div>`;
+    } else {
+      infoEl.innerHTML = '<div class="import-last-info import-last-info-empty">Nenhuma importação registrada ainda.</div>';
+    }
+  } catch { infoEl.innerHTML = ''; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,13 +314,17 @@ function calcInativacaoSugestoes() {
   const cutoffStr = cutoff.toISOString().split('T')[0];
   return Object.entries(patLastConsult)
     .filter(([patId, lastDate]) => {
-      if (lastDate > cutoffStr) return false;
       const pac = S.data.patients.find(p => p.id === patId);
-      return pac && pac.status === 'ativo';
+      if (!pac || pac.status !== 'ativo') return false;
+      // Usa o máximo entre última consulta e data do "manter ativo" como referência
+      const ref = (pac.manterAtivoDesde && pac.manterAtivoDesde > lastDate)
+        ? pac.manterAtivoDesde
+        : lastDate;
+      return ref <= cutoffStr;
     })
     .map(([patId, lastDate]) => {
       const pac = S.data.patients.find(p => p.id === patId);
-      return { patId, lastDate, name: pac?.name || '—' };
+      return { patId, lastDate, name: pac?.name || '—', manterAtivoDesde: pac?.manterAtivoDesde || null };
     })
     .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
 }
@@ -1544,7 +1567,7 @@ function renderRetornoAlert() {
     .filter(([patId, lastDate]) => {
       if (lastDate > cutoffStr || hasFuture.has(patId)) return false;
       const pac = S.data.patients.find(p => p.id === patId);
-      return pac && pac.status !== 'inativo';
+      return pac && pac.status === 'ativo';
     })
     .map(([patId, lastDate]) => {
       const pac = S.data.patients.find(p => p.id === patId);
@@ -1593,28 +1616,43 @@ function renderInativacaoSugestoes() {
   if (pill) pill.textContent = lista.length;
   setCount('badge-inativacao', lista.length);
   if (!lista.length) {
-    container.innerHTML = '<div class="empty-state">Nenhuma sugestão de inativação.</div>';
+    container.innerHTML = '<div class="empty-state">Nenhum paciente para revisão de longa ausência.</div>';
     return;
   }
-  container.innerHTML = lista.map(p => `
+  container.innerHTML = lista.map(p => {
+    const diasRef = p.manterAtivoDesde && p.manterAtivoDesde > p.lastDate
+      ? daysBetween(p.manterAtivoDesde, todayStr)
+      : daysBetween(p.lastDate, todayStr);
+    const mantidoInfo = p.manterAtivoDesde
+      ? `<div class="inativacao-item-meta" style="color:var(--text-muted)">Renovado em: ${fmtDate(p.manterAtivoDesde)}</div>`
+      : '';
+    return `
     <div class="inativacao-item" id="inativ-row-${p.patId}">
       <div class="inativacao-item-info">
         <div class="inativacao-item-name">
           <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
         </div>
-        <div class="inativacao-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${daysBetween(p.lastDate, todayStr)} dias</div>
+        <div class="inativacao-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${diasRef} dias sem retorno</div>
+        ${mantidoInfo}
       </div>
       <div class="inativacao-item-actions">
-        <button class="btn btn-sm btn-outline" data-action="inativ-suggest" data-id="${p.patId}">Marcar como inativo</button>
+        <button class="btn btn-sm btn-outline" data-action="inativ-suggest" data-id="${p.patId}">Revisar</button>
       </div>
       <div class="inativacao-confirm hidden">
-        <span class="inativacao-confirm-text">Tem certeza? Esta ação pode ser desfeita no cadastro.</span>
-        <div class="inativacao-confirm-btns">
+        <div class="inativacao-confirm-status-row">
+          <select class="inativacao-status-sel" id="inativ-sel-${p.patId}">
+            <option value="alta">Alta — tratamento concluído</option>
+            <option value="inativo">Inativo — abandono/sem retorno</option>
+          </select>
           <button class="btn btn-sm btn-danger" data-action="inativ-confirm" data-id="${p.patId}">Confirmar</button>
+        </div>
+        <div class="inativacao-confirm-manter-row">
+          <button class="btn btn-sm btn-outline" data-action="inativ-manter" data-id="${p.patId}">Manter ativo (+180 dias)</button>
           <button class="btn btn-sm btn-outline" data-action="inativ-cancel" data-id="${p.patId}">Cancelar</button>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 function renderNFPendentes() {
@@ -1842,12 +1880,12 @@ function handleFileSelection(files) {
     reader.onload = e => {
       const text   = e.target.result;
       const header = text.split('\n')[0] || '';
-      const type   = detectCSVType(header);
-      if (type && !S.importFiles[type]) {
+      const type   = detectCSVType(header, file.name);
+      if ((type === 'patient' || type === 'event') && !S.importFiles[type]) {
         S.importFiles[type] = { file, text };
         detected.push({ name: file.name, type });
       } else {
-        detected.push({ name: file.name, type: null });
+        detected.push({ name: file.name, type });
       }
       if (detected.length === files.length) renderFilesPreview(detected);
     };
@@ -1855,24 +1893,34 @@ function handleFileSelection(files) {
   }
 }
 
-function detectCSVType(header) {
-  if (header.includes('patient_id') && header.includes('birthdate'))       return 'patient';
-  if (header.includes('procedure_pack') && header.includes('schedule_id')) return 'event';
-  return null;
+function detectCSVType(header, filename) {
+  const patPat = /^\d{2}-\d{2}-\d{4}-patient\.csv$/i;
+  const evtPat = /^\d{2}-\d{2}-\d{4}-event_scheduling\.csv$/i;
+  if (!patPat.test(filename) && !evtPat.test(filename)) return 'invalid-name';
+  if (patPat.test(filename) && header.includes('patient_id') && header.includes('birthdate')) return 'patient';
+  if (evtPat.test(filename) && header.includes('procedure_pack') && header.includes('schedule_id')) return 'event';
+  return 'invalid-content';
 }
 
 function renderFilesPreview(detected) {
   const preview    = el('import-files-preview');
-  const icons      = { patient:'👤', event:'📅' };
-  const typeLabels = { patient:'Pacientes', event:'Agendamentos' };
+  const icons      = { patient:'👤', event:'📅', 'invalid-name':'⛔', 'invalid-content':'⚠️' };
+  const typeLabels = {
+    patient:          'Pacientes',
+    event:            'Agendamentos',
+    'invalid-name':   'Nome inválido — use DD-MM-YYYY-patient.csv ou DD-MM-YYYY-event_scheduling.csv',
+    'invalid-content':'Conteúdo não reconhecido',
+  };
+  const hasInvalid = detected.some(f => f.type === 'invalid-name' || f.type === 'invalid-content' || !f.type);
   preview.innerHTML = detected.map(f => `
     <div class="import-file-row">
       <span class="import-file-icon">${icons[f.type]||'📄'}</span>
       <span class="import-file-name">${esc(f.name)}</span>
-      <span class="import-file-type ${f.type?'detected':'unknown'}">${f.type?typeLabels[f.type]:'Não reconhecido'}</span>
+      <span class="import-file-type ${(f.type==='patient'||f.type==='event')?'detected':'unknown'}">${typeLabels[f.type]||'Não reconhecido'}</span>
     </div>`).join('');
   preview.classList.remove('hidden');
   el('import-actions-bar').classList.remove('hidden');
+  el('btn-run-import').disabled = hasInvalid;
   el('import-result').classList.add('hidden');
 }
 
@@ -1944,15 +1992,15 @@ async function runImport() {
         const existing = existingMap[icId];
         if (existing) {
           if (existing.manuallyEdited) {
-            // Paciente curado manualmente: só atualiza IDs e status iClinic, preserva dados pessoais
+            // Curado manualmente: só atualiza IDs de vínculo — preserva status, nome e todos os dados curados
             await updateDoc(doc(db, 'patients', existing.id), {
               iclinicPatientId: icId,
               iclinicPk:        r.pk || '',
-              status:           data.status,
               updatedAt:        serverTimestamp(),
             });
             results.patientsSkipped++;
           } else {
+            // updateDoc não apaga campos ausentes, então manterAtivoDesde é preservado automaticamente
             await updateDoc(doc(db, 'patients', existing.id), { ...data, updatedAt: serverTimestamp() });
             results.patientsUpdated++;
           }
@@ -2031,6 +2079,17 @@ async function runImport() {
     updateBadges();
     setProgress(100, 'Concluído!');
 
+    // Gravar registro da última importação
+    await setDoc(doc(db, 'metadata', 'lastImport'), {
+      timestamp:        serverTimestamp(),
+      userEmail:        S.user.email,
+      patientsAdded:    results.patientsAdded,
+      patientsUpdated:  results.patientsUpdated,
+      patientsSkipped:  results.patientsSkipped,
+      eventsAdded:      results.eventsAdded,
+      eventsUpdated:    results.eventsUpdated,
+    });
+
     const res = el('import-result');
     res.className = 'import-result success';
     res.innerHTML = `
@@ -2043,6 +2102,7 @@ async function runImport() {
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');
     showToast('Importação concluída!', 'success');
+    renderImportTab();
   } catch (err) {
     handleErr(err);
     setProgress(0, '');
@@ -2417,14 +2477,31 @@ document.addEventListener('click', (e) => {
     (async () => {
       const pac = S.data.patients.find(p => p.id === id);
       if (!pac) return;
+      const sel = el(`inativ-sel-${id}`);
+      const novoStatus = sel ? sel.value : 'inativo';
+      const label = novoStatus === 'alta' ? 'Alta' : 'Inativo';
       showLoading();
       try {
-        await updateDoc(doc(db, 'patients', id), { status: 'inativo', manuallyEdited: true, updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, 'patients', id), { status: novoStatus, manuallyEdited: true, updatedAt: serverTimestamp() });
         await reloadCollection('patients');
         updateBadges();
         renderInativacaoSugestoes();
         if (S.view === 'pacientes') renderPacientes();
-        showToast(`${pac.name} marcado(a) como inativo(a).`, 'success');
+        showToast(`${pac.name} marcado(a) como ${label}.`, 'success');
+      } catch (err) { handleErr(err); } finally { hideLoading(); }
+    })();
+  }
+  else if (action === 'inativ-manter') {
+    (async () => {
+      const pac = S.data.patients.find(p => p.id === id);
+      if (!pac) return;
+      showLoading();
+      try {
+        await updateDoc(doc(db, 'patients', id), { manterAtivoDesde: today(), updatedAt: serverTimestamp() });
+        await reloadCollection('patients');
+        updateBadges();
+        renderInativacaoSugestoes();
+        showToast(`${pac.name} mantido(a) ativo(a) por mais 180 dias.`, 'success');
       } catch (err) { handleErr(err); } finally { hideLoading(); }
     })();
   }
@@ -2502,7 +2579,7 @@ function nfBadge(status) {
   return `<span class="badge ${cls[status]||''}">${labels.invoiceStatus[status]||status||'—'}</span>`;
 }
 function patientStatusBadge(status) {
-  const cls = {ativo:'badge-ativo',inativo:'badge-inativo'};
+  const cls = { ativo:'badge-ativo', inativo:'badge-inativo', alta:'badge-alta' };
   return `<span class="badge ${cls[status]||''}">${labels.patientStatus[status]||status||'—'}</span>`;
 }
 
