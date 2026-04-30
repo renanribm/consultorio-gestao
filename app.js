@@ -737,13 +737,13 @@ function renderAgenda() {
     const chips = events.slice(0, 3).map(e => {
       const isBlock  = !e.iclinicPatientId && !e.patientId;
       const chipCls  = isBlock ? 'cal-chip-block' : `cal-chip-${e.status || 'sc'}`;
-      const chipText = isBlock
-        ? (e.notes || 'Bloqueio').substring(0, 22)
-        : (() => { const parts = (e.patientName || '?').split(' '); return parts.length > 1 ? `${parts[0]} ${parts[parts.length-1]}` : parts[0]; })();
       const chipTitle = isBlock
         ? (e.notes || 'Bloqueio pessoal')
         : `${e.patientName || '?'} — ${e.status || ''}`;
-      return `<div class="cal-chip ${chipCls}" title="${esc(chipTitle)}">${esc(chipText)}</div>`;
+      const parts = (e.patientName || '?').split(' ');
+      const chipFull  = isBlock ? (e.notes || 'Bloqueio').substring(0, 22) : (parts.length > 1 ? `${parts[0]} ${parts[parts.length-1]}` : parts[0]);
+      const chipShort = isBlock ? (e.notes || 'Bloqueio').substring(0, 10) : parts[0];
+      return `<div class="cal-chip ${chipCls}" title="${esc(chipTitle)}"><span class="chip-desktop">${esc(chipFull)}</span><span class="chip-mobile">${esc(chipShort)}</span></div>`;
     }).join('');
     const more = events.length > 3 ? `<div class="cal-chip cal-chip-more">+${events.length - 3}</div>` : '';
 
