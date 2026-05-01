@@ -74,7 +74,7 @@ onAuthStateChanged(auth, async (user) => {
     S.role = role;
     applyRoleUI();
     await loadAll();
-    navigateTo('dashboard');
+    navigateTo(S.role === 'secretaria' ? 'secretaria' : 'dashboard');
     el('loading-overlay').classList.add('hidden');
   } else {
     unsubscribeAll();
@@ -107,8 +107,11 @@ el('login-form').addEventListener('submit', async (e) => {
 el('btn-logout').addEventListener('click', () => signOut(auth));
 
 function applyRoleUI() {
-  document.querySelectorAll('.nav-medica-only').forEach(e => e.classList.remove('hidden'));
-  el('sidebar-avatar').textContent    = S.role === 'medica' ? 'M' : 'S';
+  const isMedica = S.role === 'medica';
+  document.querySelectorAll('.nav-medica-only').forEach(e => e.classList.toggle('hidden', !isMedica));
+  const dashNav = document.querySelector('.nav-item[data-view="dashboard"]');
+  if (dashNav) dashNav.classList.toggle('hidden', !isMedica);
+  el('sidebar-avatar').textContent    = isMedica ? 'M' : 'S';
   el('sidebar-user-name').textContent = S.user.email.split('@')[0];
   el('sidebar-user-role').textContent = labels.role[S.role];
   el('login-screen').classList.add('hidden');
@@ -155,6 +158,7 @@ el('sidebar-backdrop').addEventListener('click', closeMobileDrawer);
 el('btn-mobile-logout').addEventListener('click', () => signOut(auth));
 
 function navigateTo(view) {
+  if (S.role === 'secretaria' && (view === 'dashboard' || view === 'dre')) view = 'secretaria';
   S.view = view;
   document.querySelectorAll('section.view').forEach(s => s.classList.add('hidden'));
   const target = el('view-' + view);
@@ -1254,6 +1258,7 @@ function renderRecebimentos() {
 
   const total    = recs.reduce((s,r)=>s+(r.value||0),0);
   const recebido = recs.filter(r=>r.status==='pix').reduce((s,r)=>s+(r.value||0),0);
+  el('summary-rec').classList.toggle('hidden', S.role !== 'medica');
   el('summary-rec').innerHTML = `${recs.length} reg. &nbsp;|&nbsp; Total: <strong>${fmtBRL(total)}</strong> &nbsp;|&nbsp; Recebido: <strong>${fmtBRL(recebido)}</strong>`;
 
   const tbody = el('tbody-rec');
@@ -1479,7 +1484,7 @@ function renderInadimplencia() {
   if (pendentes.length) {
     const total = pendentes.reduce((s,r)=>s+(r.value||0),0);
     sumEl.classList.remove('hidden');
-    sumEl.innerHTML = `<strong>${pendentes.length} pagamento${pendentes.length>1?'s':''} pendente${pendentes.length>1?'s':''}</strong> &nbsp;·&nbsp; Total em aberto: <strong>${fmtBRL(total)}</strong>`;
+    sumEl.innerHTML = `<strong>${pendentes.length} pagamento${pendentes.length>1?'s':''} pendente${pendentes.length>1?'s':''}</strong><span class="inad-sep"> &nbsp;·&nbsp; </span>Total em aberto: <strong>${fmtBRL(total)}</strong>`;
   } else {
     sumEl.classList.add('hidden');
   }
