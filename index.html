@@ -490,9 +490,14 @@
           <div class="card sec-card sec-card-tall">
             <div class="card-header">
               <div style="display:flex;flex-direction:column;gap:4px;width:100%">
-                <div style="display:flex;align-items:center;gap:10px">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                   <h3>Pacientes sem Retorno Agendado</h3>
                   <span class="badge-pill" id="retorno-count-pill" style="background:var(--amber)">0</span>
+                  <div class="chart-period-toggle" style="margin-left:auto">
+                    <button class="chart-period-btn active" data-retorno-sort="urgencia">Urgência</button>
+                    <button class="chart-period-btn" data-retorno-sort="asc">Mais antigos</button>
+                    <button class="chart-period-btn" data-retorno-sort="desc">Mais recentes</button>
+                  </div>
                 </div>
                 <p class="card-subtitle">Gestão de follow-up para remarcação de consultas</p>
               </div>

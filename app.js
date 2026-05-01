@@ -39,6 +39,7 @@ const S = {
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
   recSort:         { col: 'date', dir: 'desc' },
+  retornoSort:     'urgencia',
   chartMonths:     6,
   calendarYear:    new Date().getFullYear(),
   calendarMonth:   new Date().getMonth(),
@@ -1754,13 +1755,18 @@ function renderRetornoAlert() {
   if (!container) return;
   const todayStr = today();
 
-  const todos      = calcRetornoPatients();
-  const urgentes   = todos
-    .filter(p => p.needsContact)
-    .sort((a, b) => (b.attempts - a.attempts) || (a.lastDate || '').localeCompare(b.lastDate || ''));
-  const aguardando = todos
-    .filter(p => !p.needsContact)
-    .sort((a, b) => (a.nextContact || '').localeCompare(b.nextContact || ''));
+  const todos = calcRetornoPatients();
+  const sortFn = (() => {
+    if (S.retornoSort === 'asc')  return (a, b) => (a.lastDate || '').localeCompare(b.lastDate || '');
+    if (S.retornoSort === 'desc') return (a, b) => (b.lastDate || '').localeCompare(a.lastDate || '');
+    return (a, b) => (b.attempts - a.attempts) || (a.lastDate || '').localeCompare(b.lastDate || '');
+  })();
+  const urgentes   = todos.filter(p =>  p.needsContact).sort(sortFn);
+  const aguardando = todos.filter(p => !p.needsContact).sort(
+    S.retornoSort === 'urgencia'
+      ? (a, b) => (a.nextContact || '').localeCompare(b.nextContact || '')
+      : sortFn
+  );
 
   const pill = el('retorno-count-pill');
   if (pill) pill.textContent = todos.length;
@@ -2800,11 +2806,19 @@ document.addEventListener('click', (e) => {
   const alink = e.target.closest('.alert-link[data-view]');
   if (alink) { e.preventDefault(); navigateTo(alink.dataset.view); return; }
 
-  const periodBtn = e.target.closest('.chart-period-btn');
+  const periodBtn = e.target.closest('.chart-period-btn[data-months]');
   if (periodBtn) {
     S.chartMonths = parseInt(periodBtn.dataset.months, 10);
-    document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.toggle('active', b === periodBtn));
+    document.querySelectorAll('.chart-period-btn[data-months]').forEach(b => b.classList.toggle('active', b === periodBtn));
     renderMensalChart();
+    return;
+  }
+
+  const retornoSortBtn = e.target.closest('.chart-period-btn[data-retorno-sort]');
+  if (retornoSortBtn) {
+    S.retornoSort = retornoSortBtn.dataset.retornoSort;
+    document.querySelectorAll('.chart-period-btn[data-retorno-sort]').forEach(b => b.classList.toggle('active', b === retornoSortBtn));
+    renderRetornoAlert();
     return;
   }
 
