@@ -50,15 +50,6 @@ const S = {
   paymentImportRows: null,
 };
 
-const RETORNO_MILESTONES  = [37, 45, 60, 75, 90]; // dias desde última consulta
-const RETORNO_STAGE_COLORS = [
-  { bg: '#dbeafe', color: '#1d4ed8' }, // 1ª — azul
-  { bg: '#fef9c3', color: '#92400e' }, // 2ª — âmbar
-  { bg: '#ffedd5', color: '#c2410c' }, // 3ª — laranja
-  { bg: '#fee2e2', color: '#b91c1c' }, // 4ª — vermelho
-  { bg: '#fce7f3', color: '#9d174d' }, // 5ª — carmim
-];
-const RETORNO_STAGE_LABELS = ['1ª mensagem','2ª mensagem','3ª mensagem','4ª mensagem','5ª mensagem'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH
