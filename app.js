@@ -38,6 +38,7 @@ const S = {
   nfSelected:      new Set(),
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
+  pacStatusFilter: 'todos',
   recSort:         { col: 'date', dir: 'desc' },
   retornoSort:     'urgencia',
   chartMonths:     6,
@@ -1033,7 +1034,11 @@ function renderPacientes() {
   const q = el('search-pac').value.toLowerCase();
   let rows = S.data.patients
     .filter(p => !q || (p.name||'').toLowerCase().includes(q))
+    .filter(p => S.pacStatusFilter === 'todos' || (p.status || 'ativo') === S.pacStatusFilter)
     .map(p => ({ p, stats: getPatientStats(p.id, p.name) }));
+
+  document.querySelectorAll('.pac-status-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.pacStatus === S.pacStatusFilter));
 
   const { col, dir } = S.pacSort;
   const mult = dir === 'asc' ? 1 : -1;
@@ -2854,6 +2859,13 @@ document.addEventListener('click', (e) => {
     S.retornoSort = retornoSortBtn.dataset.retornoSort;
     document.querySelectorAll('.chart-period-btn[data-retorno-sort]').forEach(b => b.classList.toggle('active', b === retornoSortBtn));
     renderRetornoAlert();
+    return;
+  }
+
+  const pacStatusBtn = e.target.closest('.pac-status-btn[data-pac-status]');
+  if (pacStatusBtn) {
+    S.pacStatusFilter = pacStatusBtn.dataset.pacStatus;
+    renderPacientes();
     return;
   }
 
