@@ -360,6 +360,8 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
    INADIMPLÊNCIA
    ============================================================ */
 .inadimplencia-summary { background: var(--red-bg); border: 1px solid var(--red-border); border-radius: var(--radius); padding: 14px 20px; }
+.wa-btn { display:inline-flex; align-items:center; opacity:.8; transition:opacity .15s; flex-shrink:0; }
+.wa-btn:hover { opacity:1; }
 @media (max-width: 640px) {
   .inad-sep { display: block; height: 0; overflow: hidden; }
   .inadimplencia-summary { display: flex; flex-direction: column; gap: 4px; }

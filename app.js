@@ -1237,9 +1237,11 @@ function renderPacienteDetalhe(patientId) {
     pacienteDesdeTxt ? ['Paciente desde', pacienteDesdeTxt]                            : null,
   ].filter(Boolean);
 
-  el('pac-info-grid').innerHTML = infoItems.map(([label, value]) =>
-    `<div class="pac-info-item"><div class="pac-info-label">${label}</div><div class="pac-info-value">${esc(value)}</div></div>`
-  ).join('') + (pac.notes ? `<div class="pac-info-item pac-info-wide"><div class="pac-info-label">Observações</div><div class="pac-info-value">${esc(pac.notes)}</div></div>` : '');
+  el('pac-info-grid').innerHTML = infoItems.map(([label, value]) => {
+    const isPhone = label === 'Telefone' || label === 'Telefone 2';
+    const extra = isPhone && value !== '—' ? waBtn(value) : '';
+    return `<div class="pac-info-item"><div class="pac-info-label">${label}</div><div class="pac-info-value" style="${extra ? 'display:flex;align-items:center;gap:6px' : ''}">${esc(value)}${extra}</div></div>`;
+  }).join('') + (pac.notes ? `<div class="pac-info-item pac-info-wide"><div class="pac-info-label">Observações</div><div class="pac-info-value">${esc(pac.notes)}</div></div>` : '');
 
   const tbody = el('tbody-historico');
   if (!stats.recs.length) {
@@ -1757,6 +1759,7 @@ function renderAniversariantesMes() {
     return `<div class="aniversario-mes-item ${cls}">
       <span class="aniversario-mes-dia">${diaPac}/${mm}</span>
       <span class="patient-link" data-patient="${p.id}" style="cursor:pointer">${esc(p.name)}</span>
+      ${p.phone ? waBtn(p.phone) : ''}
       <span style="font-size:.72rem;color:var(--text-muted)">${tag}</span>
     </div>`;
   }).join('');
@@ -1935,7 +1938,7 @@ function renderRetornoAlert() {
         <span class="patient-link retorno-item-name" data-patient="${p.patId}">${esc(p.name)}</span>
       </div>
       ${nextLine}
-      ${p.phone ? `<div class="retorno-item-phone">${esc(p.phone)}</div>` : ''}
+      ${p.phone ? `<div class="retorno-item-phone" style="display:flex;align-items:center;gap:6px">${esc(p.phone)}${waBtn(p.phone)}</div>` : ''}
       ${contextLine}
       ${inativBlock}
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
@@ -3106,6 +3109,12 @@ function fmtBRLShort(v)     { return v>=1000?'R$'+(v/1000).toFixed(0)+'k':fmtBRL
 function fmtDate(d)         { if(!d)return'—'; const[y,m,dy]=d.split('-'); return`${dy}/${m}/${y}`; }
 function fmtCPF(v)          { const d=(v||'').replace(/\D/g,''); return d.length===11?`${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`:v; }
 function fmtTimestamp(ts)   { try{return ts.toDate().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return''} }
+function waBtn(phone) {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+  const num = digits.startsWith('55') ? digits : '55' + digits;
+  return `<a href="https://wa.me/${num}" target="_blank" rel="noopener" class="wa-btn" title="Abrir no WhatsApp"><svg viewBox="0 0 24 24" width="16" height="16" fill="#25d366" style="display:block"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.117.554 4.104 1.523 5.827L.057 23.428a.5.5 0 00.514.572l5.762-1.512A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.9 9.9 0 01-5.031-1.371l-.361-.214-3.741.981.999-3.648-.235-.374A9.862 9.862 0 012.1 12C2.1 6.534 6.534 2.1 12 2.1S21.9 6.534 21.9 12 17.466 21.9 12 21.9z"/></svg></a>`;
+}
 function daysBetween(d1,d2) { return Math.max(0,Math.round((new Date(d2)-new Date(d1))/86400000)); }
 function dateAddDays(dateStr,n) { const d=new Date(dateStr); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
 function sumWhere(arr,pred) { return arr.filter(pred).reduce((s,r)=>s+(r.value||0),0); }
