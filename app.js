@@ -1222,10 +1222,6 @@ function renderPacienteDetalhe(patientId) {
   const age = pac.birthDate ? calcAge(pac.birthDate) : null;
   const genderMap = { m:'Masculino', f:'Feminino', o:'Outro' };
 
-  const pacienteDesdeTxt = pac.createdAt
-    ? pac.createdAt.toDate().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : null;
-
   const infoItems = [
     ['Telefone', pac.phone || '—'],
     pac.phone2    ? ['Telefone 2', pac.phone2]                                         : null,
@@ -1234,7 +1230,6 @@ function renderPacienteDetalhe(patientId) {
     pac.gender    ? ['Sexo', genderMap[pac.gender] || pac.gender]                      : null,
     pac.cpf       ? ['CPF', fmtCPF(pac.cpf)]                                          : null,
     pac.indication? ['Como chegou', pac.indication]                                    : null,
-    pacienteDesdeTxt ? ['Paciente desde', pacienteDesdeTxt]                            : null,
   ].filter(Boolean);
 
   el('pac-info-grid').innerHTML = infoItems.map(([label, value]) => {
