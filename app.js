@@ -1756,7 +1756,7 @@ function renderAniversariantesMes() {
     const cls = isHoje ? 'hoje' : passou ? 'passou' : '';
     return `<div class="aniversario-mes-item ${cls}">
       <span class="aniversario-mes-dia">${diaPac}/${mm}</span>
-      <a href="#" class="patient-link" data-patient="${p.id}" style="text-decoration:none;color:inherit">${esc(p.name)}</a>
+      <span class="patient-link" data-patient="${p.id}" style="cursor:pointer">${esc(p.name)}</span>
       <span style="font-size:.72rem;color:var(--text-muted)">${tag}</span>
     </div>`;
   }).join('');
@@ -2895,7 +2895,7 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 // ─────────────────────────────────────────────────────────────────────────────
 document.addEventListener('click', (e) => {
   const plink = e.target.closest('[data-patient]');
-  if (plink) { navigateToPatient(plink.dataset.patient); return; }
+  if (plink) { e.preventDefault(); navigateToPatient(plink.dataset.patient); return; }
 
   const alink = e.target.closest('.alert-link[data-view]');
   if (alink) { e.preventDefault(); navigateTo(alink.dataset.view); return; }
