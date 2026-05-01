@@ -1720,6 +1720,7 @@ el('form-nf').addEventListener('submit', async (e) => {
 });
 
 function renderSecretaria() {
+  S.nfTab = 'pendentes';
   renderNFPendentes();
   renderRetornoAlert();
   renderInativacaoSugestoes();
