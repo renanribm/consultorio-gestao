@@ -1238,6 +1238,7 @@ el('form-rec').addEventListener('submit', async (e) => {
     value:           parseFloat(el('rec-valor').value) || 0,
     status:          el('rec-status').value,
     invoiceStatus:   el('rec-nf').value,
+    invoiceNumber:   el('rec-invoice-number').value.trim(),
     notes:           el('rec-obs').value.trim(),
   };
   await saveRecebimento(data, S.editingRec);
@@ -1321,8 +1322,9 @@ function openModalRec(rec = null, prefill = null) {
   el('rec-tipo').value        = rec ? (rec.consultationType||'') : (prefill?.consultationType || '');
   el('rec-valor').value       = rec ? (rec.value || '') : '';
   el('rec-status').value      = rec ? (rec.status || '') : '';
-  el('rec-nf').value          = rec ? (rec.invoiceStatus || 'pendente') : 'pendente';
-  el('rec-obs').value         = rec ? (rec.notes || '') : '';
+  el('rec-nf').value              = rec ? (rec.invoiceStatus || 'pendente') : 'pendente';
+  el('rec-invoice-number').value  = rec ? (rec.invoiceNumber || '') : '';
+  el('rec-obs').value             = rec ? (rec.notes || '') : '';
   openModal('modal-rec');
 }
 
