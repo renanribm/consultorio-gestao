@@ -695,7 +695,7 @@ function renderDashboard() {
   alertEl.classList.toggle('hidden', pendNF.length === 0);
   if (pendNF.length) setText('alert-nf-count', `${pendNF.length} nota${pendNF.length>1?'s fiscais':' fiscal'}`);
 
-  if (S.filter.start) setText('dash-period', `${fmtDate(S.filter.start)} → ${fmtDate(S.filter.end)}`);
+  setText('dash-title', `Dashboard — ${drePeriodLabel()}`);
   renderAniversariantes('alert-aniversario', 'alert-aniversario-text');
   renderMensalChart();
   renderRecent();
