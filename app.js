@@ -1388,6 +1388,36 @@ el('form-desp').addEventListener('submit', async (e) => {
     value,
     taxRate:     taxRate ?? null,
   };
+
+  const isNew    = !S.editingDesp;
+  const isMensal = data.recurrence === 'mensal';
+
+  if (isNew && isMensal) {
+    closeModal('modal-desp');
+    showConfirm(
+      `Isso vai criar 12 lançamentos mensais a partir de ${fmtDate(data.date)} com o valor ${fmtBRL(data.value)} cada. Confirmar?`,
+      async () => {
+        showLoading();
+        try {
+          const batch = writeBatch(db);
+          for (let i = 0; i < 12; i++) {
+            const [y, m, d] = data.date.split('-').map(Number);
+            const dt = new Date(y, m - 1 + i, d);
+            const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+            batch.set(doc(collection(db, 'despesas')), {
+              ...data, date: dateStr, createdAt: serverTimestamp(), createdBy: S.user.uid,
+            });
+          }
+          await batch.commit();
+          showToast('12 lançamentos mensais criados!', 'success');
+          renderDespesas();
+        } catch (err) { handleErr(err); } finally { hideLoading(); }
+      },
+      { title: 'Criar despesa recorrente', okLabel: 'Criar 12 lançamentos' }
+    );
+    return;
+  }
+
   await saveDespesa(data, S.editingDesp);
   closeModal('modal-desp');
   renderDespesas();
