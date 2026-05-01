@@ -45,6 +45,16 @@ const S = {
   paymentImportRows: null,
 };
 
+const RETORNO_MILESTONES  = [37, 45, 60, 75, 90]; // dias desde última consulta
+const RETORNO_STAGE_COLORS = [
+  { bg: '#dbeafe', color: '#1d4ed8' }, // 1ª — azul
+  { bg: '#fef9c3', color: '#92400e' }, // 2ª — âmbar
+  { bg: '#ffedd5', color: '#c2410c' }, // 3ª — laranja
+  { bg: '#fee2e2', color: '#b91c1c' }, // 4ª — vermelho
+  { bg: '#fce7f3', color: '#9d174d' }, // 5ª — carmim
+];
+const RETORNO_STAGE_LABELS = ['1ª mensagem','2ª mensagem','3ª mensagem','4ª mensagem','5ª mensagem'];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // AUTH
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1601,35 +1611,28 @@ function renderSecretaria() {
   if (!el('r-data').value) el('r-data').value = today();
 }
 
-function renderRetornoAlert() {
-  const container = el('retorno-list');
-  if (!container) return;
-
+function calcRetornoPatients() {
   const todayStr = today();
-  const DIAS_SEM_RETORNO = 30;
-
-  // patients with at least one past completed consultation
   const completedStatuses = new Set(['cp', 'at', 'co']);
+
   const patLastConsult = {};
   S.data.consultations.forEach(c => {
     if (!c.patientId || !c.date || c.date > todayStr) return;
     if (!completedStatuses.has(c.status)) return;
-    if (!patLastConsult[c.patientId] || c.date > patLastConsult[c.patientId]) {
+    if (!patLastConsult[c.patientId] || c.date > patLastConsult[c.patientId])
       patLastConsult[c.patientId] = c.date;
-    }
   });
 
-  // patients with a future scheduled consultation
   const hasFuture = new Set();
   S.data.consultations.forEach(c => {
     if (c.patientId && c.date >= todayStr) hasFuture.add(c.patientId);
   });
 
   const cutoff = new Date(todayStr);
-  cutoff.setDate(cutoff.getDate() - DIAS_SEM_RETORNO);
+  cutoff.setDate(cutoff.getDate() - 30);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  const semRetorno = Object.entries(patLastConsult)
+  return Object.entries(patLastConsult)
     .filter(([patId, lastDate]) => {
       if (lastDate > cutoffStr || hasFuture.has(patId)) return false;
       const pac = S.data.patients.find(p => p.id === patId);
@@ -1637,40 +1640,131 @@ function renderRetornoAlert() {
     })
     .map(([patId, lastDate]) => {
       const pac = S.data.patients.find(p => p.id === patId);
-      return { patId, lastDate, name: pac?.name || '—', phone: pac?.phone || pac?.phone2 || '' };
-    })
+      const days = daysBetween(lastDate, todayStr);
+
+      let reachedStage = 0;
+      for (let i = 0; i < RETORNO_MILESTONES.length; i++) {
+        if (days >= RETORNO_MILESTONES[i]) reachedStage = i + 1;
+      }
+
+      // só conta contatos registrados APÓS a última consulta (evita carry-over de ciclos anteriores)
+      const contatos = (pac.retornoContatos || []).filter(c => c.data >= lastDate);
+      const lastContactedStage = contatos.length ? Math.max(...contatos.map(c => c.etapa)) : 0;
+      const needsContact = reachedStage > lastContactedStage;
+
+      let nextMilestoneDate = null;
+      if (!needsContact && lastContactedStage < RETORNO_MILESTONES.length) {
+        const daysToNext = RETORNO_MILESTONES[lastContactedStage] - days;
+        if (daysToNext > 0) {
+          const d = new Date(todayStr);
+          d.setDate(d.getDate() + daysToNext);
+          nextMilestoneDate = d.toISOString().split('T')[0];
+        }
+      }
+
+      return { patId, name: pac.name || '—', phone: pac.phone || pac.phone2 || '',
+               lastDate, days, reachedStage, lastContactedStage, needsContact, nextMilestoneDate };
+    });
+}
+
+function renderRetornoAlert() {
+  const container = el('retorno-list');
+  if (!container) return;
+
+  const todos     = calcRetornoPatients();
+  const urgentes  = todos
+    .filter(p => p.needsContact && p.reachedStage > 0)
+    .sort((a, b) => b.reachedStage - a.reachedStage || a.lastDate.localeCompare(b.lastDate));
+  const aguardando = todos
+    .filter(p => !p.needsContact && p.lastContactedStage > 0)
+    .sort((a, b) => (a.nextMilestoneDate || '9999').localeCompare(b.nextMilestoneDate || '9999'));
+  const semEtapa  = todos
+    .filter(p => p.reachedStage === 0 && p.lastContactedStage === 0)
     .sort((a, b) => S.retornoSort === 'asc'
       ? a.lastDate.localeCompare(b.lastDate)
       : b.lastDate.localeCompare(a.lastDate));
 
   const pill = el('retorno-count-pill');
-  if (pill) pill.textContent = semRetorno.length;
+  if (pill) pill.textContent = todos.length;
   const badge = el('badge-retorno');
-  if (badge) { badge.textContent = semRetorno.length || ''; badge.classList.toggle('hidden', semRetorno.length === 0); }
+  if (badge) { badge.textContent = urgentes.length || ''; badge.classList.toggle('hidden', urgentes.length === 0); }
   const banner = el('retorno-banner');
   if (banner) {
-    if (semRetorno.length > 0) {
-      el('retorno-banner-text').textContent = `${semRetorno.length} paciente${semRetorno.length > 1 ? 's ativos' : ' ativo'} sem retorno agendado há mais de 30 dias.`;
+    if (urgentes.length > 0) {
+      el('retorno-banner-text').textContent = `${urgentes.length} paciente${urgentes.length > 1 ? 's' : ''} aguardando contato de retorno.`;
       banner.classList.remove('hidden');
     } else {
       banner.classList.add('hidden');
     }
   }
 
-  if (!semRetorno.length) {
+  if (!todos.length) {
     container.innerHTML = '<div class="empty-state">Nenhum paciente sem retorno agendado.</div>';
     return;
   }
 
-  container.innerHTML = semRetorno.map(p => `
+  let html = '';
+
+  if (urgentes.length) {
+    html += `<div class="retorno-section-hdr retorno-section-urgent">📩 Contatos de hoje (${urgentes.length})</div>`;
+    html += urgentes.map(p => {
+      const sc = RETORNO_STAGE_COLORS[p.reachedStage - 1];
+      return `<div class="retorno-item retorno-item-urgent">
+        <div class="retorno-item-top">
+          <span class="retorno-stage-badge" style="background:${sc.bg};color:${sc.color}">${RETORNO_STAGE_LABELS[p.reachedStage - 1]}</span>
+          <span class="patient-link retorno-item-name" data-patient="${p.patId}">${esc(p.name)}</span>
+        </div>
+        <div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${p.days} dias sem retorno</div>
+        ${p.phone ? `<div class="retorno-item-phone">${esc(p.phone)}</div>` : ''}
+        <button class="btn btn-sm btn-primary retorno-contact-btn"
+          data-action="retorno-contact" data-id="${p.patId}" data-stage="${p.reachedStage}">✉ Mensagem enviada</button>
+      </div>`;
+    }).join('');
+  }
+
+  if (aguardando.length) {
+    html += `<div class="retorno-section-hdr retorno-section-waiting">⏳ Aguardando próximo contato (${aguardando.length})</div>`;
+    html += aguardando.map(p => {
+      const sc = RETORNO_STAGE_COLORS[p.lastContactedStage - 1];
+      const nextInfo = p.nextMilestoneDate
+        ? `Próximo: ${fmtDate(p.nextMilestoneDate)}`
+        : 'Todos os contatos enviados';
+      return `<div class="retorno-item retorno-item-waiting">
+        <div class="retorno-item-top">
+          <span class="retorno-stage-badge" style="background:${sc.bg};color:${sc.color};opacity:.75">${RETORNO_STAGE_LABELS[p.lastContactedStage - 1]} ✓</span>
+          <span class="patient-link retorno-item-name" data-patient="${p.patId}">${esc(p.name)}</span>
+        </div>
+        <div class="retorno-item-meta">${nextInfo} · ${p.days} dias sem retorno</div>
+      </div>`;
+    }).join('');
+  }
+
+  if (semEtapa.length) {
+    if (urgentes.length || aguardando.length)
+      html += `<div class="retorno-section-hdr">🕐 Sem contato necessário ainda (${semEtapa.length})</div>`;
+    html += semEtapa.map(p => `
     <div class="retorno-item">
-      <div class="retorno-item-name">
-        <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
-      </div>
-      <div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)}</div>
-      <div class="retorno-item-meta">${daysBetween(p.lastDate, todayStr)} dias sem retorno</div>
+      <div class="retorno-item-name"><span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span></div>
+      <div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${p.days} dias sem retorno</div>
       ${p.phone ? `<div class="retorno-item-phone">${esc(p.phone)}</div>` : ''}
     </div>`).join('');
+  }
+
+  container.innerHTML = html;
+}
+
+async function markRetornoContact(patId, stage) {
+  const pac = S.data.patients.find(p => p.id === patId);
+  if (!pac) return;
+  showLoading();
+  try {
+    const existing = (pac.retornoContatos || []).filter(c => c.etapa !== stage);
+    const updated  = [...existing, { etapa: stage, data: today() }];
+    await updateDoc(doc(db, 'patients', patId), { retornoContatos: updated, updatedAt: serverTimestamp() });
+    pac.retornoContatos = updated;
+    renderRetornoAlert();
+    showToast('Contato registrado.', 'success');
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
 function renderInativacaoSugestoes() {
@@ -2616,6 +2710,9 @@ document.addEventListener('click', (e) => {
   else if (action === 'cd-register-payment') {
     const ev = S.data.consultations.find(c => c.id === btn.dataset.eventId);
     if (ev) { closeModal('modal-consult-detail'); openModalRec(null, { date: ev.date, patientName: ev.patientName, patientId: ev.patientId, consultationType: ev.consultationType }); }
+  }
+  else if (action === 'retorno-contact') {
+    markRetornoContact(id, parseInt(btn.dataset.stage));
   }
   else if (action === 'inativ-suggest') {
     const row = el(`inativ-row-${id}`);
