@@ -518,10 +518,12 @@ function detectDuplicates() {
       for (let i = 0; i < g.length - 1; i++) {
         for (let j = i + 1; j < g.length; j++) {
           const key = [g[i].id, g[j].id].sort().join('_');
-          if (!seen.has(key)) {
-            seen.add(key);
-            groups.push([g[i], g[j]]);
-          }
+          if (seen.has(key)) continue;
+          seen.add(key);
+          const notDupA = g[i].notDuplicate || [];
+          const notDupB = g[j].notDuplicate || [];
+          if (notDupA.includes(g[j].id) || notDupB.includes(g[i].id)) continue;
+          groups.push([g[i], g[j]]);
         }
       }
     });
@@ -560,6 +562,9 @@ function renderDuplicatesSection() {
       <div class="dup-group-body">
         ${rowHtml(a, a.id, b.id, sA)}
         ${rowHtml(b, b.id, a.id, sB)}
+        <div style="text-align:right;padding:6px 0 2px">
+          <button class="btn btn-sm btn-outline" style="font-size:.75rem;color:var(--text-muted)" data-action="not-duplicate" data-id-a="${a.id}" data-id-b="${b.id}">Manter ambos — não são duplicatas</button>
+        </div>
       </div>
     </div>`;
   }).join('');
@@ -1088,6 +1093,14 @@ function renderPacienteDetalhe(patientId) {
 
   const stats = getPatientStats(patientId, pac.name);
   const freqTxt = stats.avgFrequency ? `a cada ${stats.avgFrequency} dias` : '—';
+  const todayStr = today();
+  const lastPastVisit = stats.recs.find(r => r.date <= todayStr)?.date || null;
+  const nextConsult   = S.data.consultations
+    .filter(c => c.patientId === patientId && c.date > todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
+  const retornoMeta = nextConsult
+    ? `<div class="kpi-meta" style="color:var(--green,#16a34a);font-weight:600">Próxima: ${fmtDate(nextConsult.date)}</div>`
+    : `<div class="kpi-meta" style="color:var(--amber,#d97706);font-weight:600">Sem retorno agendado</div>`;
 
   el('pac-kpis').innerHTML = `
     <div class="kpi-card kpi-blue">
@@ -1097,8 +1110,9 @@ function renderPacienteDetalhe(patientId) {
     </div>
     <div class="kpi-card kpi-sage">
       <div class="kpi-label">Última Visita</div>
-      <div class="kpi-value" style="font-size:1.2rem">${stats.lastVisit ? fmtDate(stats.lastVisit) : '—'}</div>
-      <div class="kpi-meta">${stats.firstVisit ? `Desde ${fmtDate(stats.firstVisit)}` : ''}</div>
+      <div class="kpi-value" style="font-size:1.2rem">${lastPastVisit ? fmtDate(lastPastVisit) : '—'}</div>
+      ${stats.firstVisit ? `<div class="kpi-meta">Desde ${fmtDate(stats.firstVisit)}</div>` : ''}
+      ${lastPastVisit ? retornoMeta : ''}
     </div>
     <div class="kpi-card kpi-purple">
       <div class="kpi-label">Frequência Média</div>
@@ -2703,6 +2717,25 @@ document.addEventListener('click', (e) => {
   else if (action === 'view-pac')       { navigateToPatient(id); }
   else if (action === 'cal-select-day')      { selectCalendarDay(btn.dataset.date); }
   else if (action === 'merge-pac')           { mergePacientes(btn.dataset.keep, btn.dataset.drop); }
+  else if (action === 'not-duplicate') {
+    const idA = btn.dataset.idA, idB = btn.dataset.idB;
+    showConfirm('Confirmar que esses dois cadastros são pessoas diferentes e não devem ser marcados como duplicatas?', async () => {
+      showLoading();
+      try {
+        const pacA = S.data.patients.find(p => p.id === idA);
+        const pacB = S.data.patients.find(p => p.id === idB);
+        const notDupA = [...new Set([...(pacA?.notDuplicate || []), idB])];
+        const notDupB = [...new Set([...(pacB?.notDuplicate || []), idA])];
+        await Promise.all([
+          updateDoc(doc(db, 'patients', idA), { notDuplicate: notDupA, updatedAt: serverTimestamp() }),
+          updateDoc(doc(db, 'patients', idB), { notDuplicate: notDupB, updatedAt: serverTimestamp() }),
+        ]);
+        await reloadCollection('patients');
+        renderPacientes();
+        showToast('Par marcado como não-duplicata.', 'success');
+      } catch (err) { handleErr(err); } finally { hideLoading(); }
+    }, { title: 'Confirmar cadastros distintos', okLabel: 'Confirmar' });
+  }
   else if (action === 'open-consult-detail') { openConsultDetail(id); }
   else if (action === 'cd-edit-rec') {
     const r = S.data.recebimentos.find(r => r.id === id);
