@@ -990,8 +990,9 @@ function renderCalendarDetail(dateStr) {
       ? `<div style="font-size:.75rem;color:var(--text-muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e.notes)}</div>`
       : '';
 
+    const modalCls = isBlock ? '' : e.consultationType === 'teleconsulta' ? ' cal-event-teleconsulta' : ' cal-event-presencial';
     const clickable = !isBlock && e.id;
-    items.push(`<div class="cal-detail-item${clickable ? ' cal-detail-item-clickable' : ''}" ${clickable ? `data-action="open-consult-detail" data-id="${e.id}"` : ''}>
+    items.push(`<div class="cal-detail-item${clickable ? ' cal-detail-item-clickable' : ''}${modalCls}" ${clickable ? `data-action="open-consult-detail" data-id="${e.id}"` : ''}>
       ${timeRange}
       <div class="cal-detail-dot ${dotCls}" style="flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
