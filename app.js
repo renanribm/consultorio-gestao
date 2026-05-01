@@ -2164,7 +2164,10 @@ function renderDRE() {
     const t = r.consultationType || 'presencial';
     recByType[t] = (recByType[t]||0) + (r.value||0);
   });
-  const totalRec = Object.values(recByType).reduce((s,v)=>s+v,0);
+  const totalRec     = Object.values(recByType).reduce((s,v)=>s+v,0);
+  const recPix       = recs.filter(r=>r.status==='pix').reduce((s,r)=>s+(r.value||0),0);
+  const recPendente  = recs.filter(r=>r.status==='pendente').reduce((s,r)=>s+(r.value||0),0);
+  const countGrat    = recs.filter(r=>r.status==='gratuito').length;
 
   const catOrder  = ['aluguel','iclinic','secretaria','contador','material','impostos','outros'];
   const despByCat = Object.fromEntries(catOrder.map(c=>[c,0]));
@@ -2175,15 +2178,19 @@ function renderDRE() {
   const margem    = totalRec > 0 ? (resultado/totalRec*100) : 0;
   const paid      = recs.filter(r=>r.status==='pix');
   const ticket    = paid.length > 0 ? paid.reduce((s,r)=>s+(r.value||0),0)/paid.length : 0;
-  const pendente  = recs.filter(r=>r.status==='pendente').reduce((s,r)=>s+(r.value||0),0);
   const pct       = v => totalRec > 0 ? (v/totalRec*100).toFixed(1)+'%' : '—';
 
   const rows = [
     ['section','RECEITAS'],
+    ['subsection','Por Modalidade'],
     ['item','Presencial',     recByType.presencial,   pct(recByType.presencial)],
     ['item','Teleconsulta',   recByType.teleconsulta, pct(recByType.teleconsulta)],
-    ['item','A Receber (Pendente)', pendente,          pct(pendente)],
     ['subtotal','Total Receita Bruta', totalRec, '100%'],
+    ['spacer'],
+    ['subsection','Por Status de Pagamento'],
+    ['item','Recebido (PIX)',      recPix,     pct(recPix)],
+    ['item','A Receber (Pendente)', recPendente, pct(recPendente)],
+    ['item', `Gratuito (${countGrat} consulta${countGrat!==1?'s':''})`, 0, '—'],
     ['spacer'],
     ['section','DESPESAS'],
     ...catOrder.map(c=>['item', labels.expenseCategory[c], despByCat[c], pct(despByCat[c])]),
@@ -2194,12 +2201,13 @@ function renderDRE() {
     ['item','Margem Líquida', '', `${margem.toFixed(1)}%`],
     ['item','Ticket Médio (consultas pagas)', ticket, ''],
     ['item','Total Atendimentos', recs.length+' consultas',''],
-    ['item','Atendimentos Gratuitos', recs.filter(r=>r.status==='gratuito').length+' consultas',''],
+    ['item','Atendimentos Gratuitos', countGrat+' consultas',''],
   ];
 
   el('tbody-dre').innerHTML = rows.map(row => {
-    if (row[0]==='section') return `<tr class="dre-section-header"><td colspan="3">${row[1]}</td></tr>`;
-    if (row[0]==='spacer')  return `<tr><td colspan="3" style="padding:5px"></td></tr>`;
+    if (row[0]==='section')    return `<tr class="dre-section-header"><td colspan="3">${row[1]}</td></tr>`;
+    if (row[0]==='subsection') return `<tr><td colspan="3" style="padding:6px 16px 2px;font-size:.75rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">${row[1]}</td></tr>`;
+    if (row[0]==='spacer')     return `<tr><td colspan="3" style="padding:5px"></td></tr>`;
     if (row[0]==='subtotal') return `<tr class="dre-subtotal"><td>${row[1]}</td><td class="text-right">${typeof row[2]==='number'?fmtBRL(row[2]):row[2]}</td><td class="text-right">${row[3]}</td></tr>`;
     if (row[0]==='total') {
       const cls = row[2]>=0?'dre-positive':'dre-negative';
