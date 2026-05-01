@@ -1633,6 +1633,40 @@ function renderSecretaria() {
   renderInativacaoSugestoes();
   renderNotas();
   renderAniversariantes('aniversario-banner-sec', 'aniversario-sec-text');
+  renderAniversariantesMes();
+}
+
+function renderAniversariantesMes() {
+  const card = el('card-aniversario-mes');
+  if (!card) return;
+  const todayStr = today();
+  const [year, mm, dd] = todayStr.split('-');
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const nomeMes = meses[parseInt(mm, 10) - 1];
+
+  const lista = S.data.patients
+    .filter(p => p.status === 'ativo' && p.birthDate && p.birthDate.slice(5, 7) === mm)
+    .sort((a, b) => a.birthDate.slice(8, 10).localeCompare(b.birthDate.slice(8, 10)));
+
+  if (!lista.length) { card.classList.add('hidden'); return; }
+
+  setText('aniversario-mes-titulo', `🎂 Aniversariantes de ${nomeMes}`);
+
+  el('aniversario-mes-list').innerHTML = lista.map(p => {
+    const diaPac = p.birthDate.slice(8, 10);
+    const isHoje = diaPac === dd;
+    const passou = diaPac < dd;
+    const diasFaltam = isHoje ? 0 : parseInt(diaPac, 10) - parseInt(dd, 10);
+    const tag = isHoje ? 'hoje!' : passou ? 'passou' : `em ${diasFaltam}d`;
+    const cls = isHoje ? 'hoje' : passou ? 'passou' : '';
+    return `<div class="aniversario-mes-item ${cls}">
+      <span class="aniversario-mes-dia">${diaPac}/${mm}</span>
+      <a href="#" class="patient-link" data-patient="${p.id}" style="text-decoration:none;color:inherit">${esc(p.name)}</a>
+      <span style="font-size:.72rem;color:var(--text-muted)">${tag}</span>
+    </div>`;
+  }).join('');
+
+  card.classList.remove('hidden');
 }
 
 function calcAniversariantes() {
