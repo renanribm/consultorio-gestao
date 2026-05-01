@@ -1679,32 +1679,40 @@ function calcRetornoPatients() {
   cutoff.setDate(cutoff.getDate() - 20);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  return Object.entries(patLastConsult)
+  const mapPatient = (pac, lastDate) => {
+    const days     = lastDate ? daysBetween(lastDate, todayStr) : null;
+    const fu       = pac.retornoFollowUp || null;
+    const validFu  = fu && (lastDate ? fu.lastContactDate >= lastDate : fu.lastContactDate) ? fu : null;
+    const attempts = validFu ? (validFu.attempts || 0) : 0;
+    const nextDate = validFu ? validFu.nextContactDate : null;
+    const needsContact = !nextDate || nextDate <= todayStr;
+    return {
+      patId:           pac.id,
+      name:            pac.name || '—',
+      phone:           pac.phone || pac.phone2 || '',
+      lastDate, days, attempts, needsContact,
+      nextContact:     nextDate,
+      lastNote:        validFu?.lastContactNote || '',
+      lastSituation:   validFu?.lastContactSituation || '',
+      lastContactDate: validFu?.lastContactDate || null,
+      noConsult:       !lastDate,
+    };
+  };
+
+  const withConsult = Object.entries(patLastConsult)
     .filter(([patId, lastDate]) => {
       if (lastDate > cutoffStr || hasFuture.has(patId)) return false;
       const pac = S.data.patients.find(p => p.id === patId);
       return pac && pac.status === 'ativo';
     })
-    .map(([patId, lastDate]) => {
-      const pac  = S.data.patients.find(p => p.id === patId);
-      const days = daysBetween(lastDate, todayStr);
-      // follow-up só vale se foi registrado após a última consulta (evita carry-over)
-      const fu       = pac.retornoFollowUp || null;
-      const validFu  = fu && fu.lastContactDate >= lastDate ? fu : null;
-      const attempts = validFu ? (validFu.attempts || 0) : 0;
-      const nextDate = validFu ? validFu.nextContactDate : null;
-      const needsContact = !nextDate || nextDate <= todayStr;
-      return {
-        patId,
-        name:            pac.name || '—',
-        phone:           pac.phone || pac.phone2 || '',
-        lastDate, days, attempts, needsContact,
-        nextContact:     nextDate,
-        lastNote:        validFu?.lastContactNote || '',
-        lastSituation:   validFu?.lastContactSituation || '',
-        lastContactDate: validFu?.lastContactDate || null,
-      };
-    });
+    .map(([patId, lastDate]) => mapPatient(S.data.patients.find(p => p.id === patId), lastDate));
+
+  const withConsultIds = new Set(Object.keys(patLastConsult));
+  const noConsult = S.data.patients
+    .filter(p => p.status === 'ativo' && !withConsultIds.has(p.id) && !hasFuture.has(p.id))
+    .map(pac => mapPatient(pac, null));
+
+  return [...withConsult, ...noConsult];
 }
 
 function renderRetornoAlert() {
@@ -1715,7 +1723,7 @@ function renderRetornoAlert() {
   const todos      = calcRetornoPatients();
   const urgentes   = todos
     .filter(p => p.needsContact)
-    .sort((a, b) => (b.attempts - a.attempts) || a.lastDate.localeCompare(b.lastDate));
+    .sort((a, b) => (b.attempts - a.attempts) || (a.lastDate || '').localeCompare(b.lastDate || ''));
   const aguardando = todos
     .filter(p => !p.needsContact)
     .sort((a, b) => (a.nextContact || '').localeCompare(b.nextContact || ''));
@@ -1748,8 +1756,10 @@ function renderRetornoAlert() {
       ? `<div class="retorno-item-note">"${esc(p.lastNote)}"</div>`
       : '';
     const nextLine     = mode === 'waiting' && p.nextContact
-      ? `<div class="retorno-item-meta">Próximo contato: ${fmtDate(p.nextContact)} · ${p.days} dias sem retorno</div>`
-      : `<div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${p.days} dias sem retorno</div>`;
+      ? `<div class="retorno-item-meta">Próximo contato: ${fmtDate(p.nextContact)}${p.days ? ` · ${p.days} dias sem retorno` : ''}</div>`
+      : p.lastDate
+        ? `<div class="retorno-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${p.days} dias sem retorno</div>`
+        : `<div class="retorno-item-meta" style="color:var(--amber,#d97706)">Sem consultas registradas no sistema</div>`;
     const inativBlock  = exhausted ? `
       <div class="retorno-inativ-suggest" id="retorno-inativ-${p.patId}">
         <span class="retorno-inativ-label">⚠️ 5 tentativas sem retorno — considerar inativação</span>
