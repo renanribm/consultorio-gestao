@@ -1135,9 +1135,28 @@ function renderPacienteDetalhe(patientId) {
   const nextConsult   = S.data.consultations
     .filter(c => c.patientId === patientId && c.date > todayStr)
     .sort((a, b) => a.date.localeCompare(b.date))[0] || null;
-  const retornoMeta = nextConsult
-    ? `<div class="kpi-meta" style="color:var(--green,#16a34a);font-weight:600">Próxima: ${fmtDate(nextConsult.date)}</div>`
-    : `<div class="kpi-meta" style="color:var(--amber,#d97706);font-weight:600">Sem retorno agendado</div>`;
+  let visitCardHTML;
+  if (nextConsult) {
+    visitCardHTML = `
+    <div class="kpi-card kpi-sage">
+      <div class="kpi-label">Próxima consulta</div>
+      <div class="kpi-value" style="font-size:1.2rem;color:var(--green,#16a34a)">${fmtDate(nextConsult.date)}</div>
+      <div class="kpi-meta">${lastPastVisit ? `Última visita: ${fmtDate(lastPastVisit)}` : 'Sem visitas anteriores'}</div>
+    </div>`;
+  } else if (lastPastVisit) {
+    visitCardHTML = `
+    <div class="kpi-card kpi-sage">
+      <div class="kpi-label">Última visita</div>
+      <div class="kpi-value" style="font-size:1.2rem">${fmtDate(lastPastVisit)}</div>
+      <div class="kpi-meta" style="color:var(--amber,#d97706);font-weight:600">Sem retorno agendado</div>
+    </div>`;
+  } else {
+    visitCardHTML = `
+    <div class="kpi-card kpi-sage">
+      <div class="kpi-label">Consultas</div>
+      <div class="kpi-value" style="font-size:1rem;color:var(--text-muted)">Sem registros</div>
+    </div>`;
+  }
 
   el('pac-kpis').innerHTML = `
     <div class="kpi-card kpi-blue">
@@ -1145,12 +1164,7 @@ function renderPacienteDetalhe(patientId) {
       <div class="kpi-value">${stats.totalConsultas}</div>
       <div class="kpi-meta">${stats.totalGratuito} gratuita${stats.totalGratuito!==1?'s':''}</div>
     </div>
-    <div class="kpi-card kpi-sage">
-      <div class="kpi-label">Última Visita</div>
-      <div class="kpi-value" style="font-size:1.2rem">${lastPastVisit ? fmtDate(lastPastVisit) : '—'}</div>
-      ${stats.firstVisit ? `<div class="kpi-meta">Desde ${fmtDate(stats.firstVisit)}</div>` : ''}
-      ${lastPastVisit ? retornoMeta : ''}
-    </div>
+    ${visitCardHTML}
     <div class="kpi-card kpi-purple">
       <div class="kpi-label">Frequência Média</div>
       <div class="kpi-value" style="font-size:1.2rem">${freqTxt}</div>
@@ -1175,6 +1189,10 @@ function renderPacienteDetalhe(patientId) {
   const age = pac.birthDate ? calcAge(pac.birthDate) : null;
   const genderMap = { m:'Masculino', f:'Feminino', o:'Outro' };
 
+  const pacienteDesdeTxt = pac.createdAt
+    ? pac.createdAt.toDate().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null;
+
   const infoItems = [
     ['Telefone', pac.phone || '—'],
     pac.phone2    ? ['Telefone 2', pac.phone2]                                         : null,
@@ -1183,6 +1201,7 @@ function renderPacienteDetalhe(patientId) {
     pac.gender    ? ['Sexo', genderMap[pac.gender] || pac.gender]                      : null,
     pac.cpf       ? ['CPF', fmtCPF(pac.cpf)]                                          : null,
     pac.indication? ['Como chegou', pac.indication]                                    : null,
+    pacienteDesdeTxt ? ['Paciente desde', pacienteDesdeTxt]                            : null,
   ].filter(Boolean);
 
   el('pac-info-grid').innerHTML = infoItems.map(([label, value]) =>
