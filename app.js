@@ -36,6 +36,7 @@ const S = {
   listeners:       {},
   importing:       false,
   nfSelected:      new Set(),
+  nfTab:           'pendentes',
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
   pacStatusFilter: 'todos',
@@ -2036,12 +2037,36 @@ function renderNFPendentes() {
 
   el('nf-count-pill').textContent = pendNF.length;
 
-  // Remove stale selections
-  const pendIds = new Set(pendNF.map(r => r.id));
-  S.nfSelected.forEach(id => { if (!pendIds.has(id)) S.nfSelected.delete(id); });
-
   const toolbar = el('nf-bulk-toolbar');
   const nfList  = el('nf-list');
+
+  document.querySelectorAll('.nf-tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.nfTab === S.nfTab));
+
+  if (S.nfTab === 'emitidas') {
+    toolbar.classList.add('hidden');
+    const emitidas = S.data.recebimentos
+      .filter(r => r.invoiceStatus === 'emitida')
+      .sort((a,b) => b.date.localeCompare(a.date));
+
+    if (!emitidas.length) {
+      nfList.innerHTML = '<div class="empty-state">Nenhuma NF emitida registrada.</div>';
+      return;
+    }
+    nfList.innerHTML = emitidas.map(r => `
+      <div class="nf-item">
+        <div class="nf-item-left">
+          <div class="nf-item-name">${esc(r.patient||'—')}</div>
+          <div class="nf-item-meta">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}${r.invoiceNumber ? ` · NF ${esc(r.invoiceNumber)}` : ''}</div>
+        </div>
+        <div class="nf-item-value">${fmtBRL(r.value||0)}</div>
+      </div>`).join('');
+    return;
+  }
+
+  // Aba pendentes
+  const pendIds = new Set(pendNF.map(r => r.id));
+  S.nfSelected.forEach(id => { if (!pendIds.has(id)) S.nfSelected.delete(id); });
 
   if (!pendNF.length) {
     toolbar.classList.add('hidden');
@@ -2917,6 +2942,14 @@ document.addEventListener('click', (e) => {
   if (pacStatusBtn) {
     S.pacStatusFilter = pacStatusBtn.dataset.pacStatus;
     renderPacientes();
+    return;
+  }
+
+  const nfTabBtn = e.target.closest('.nf-tab-btn[data-nf-tab]');
+  if (nfTabBtn) {
+    S.nfTab = nfTabBtn.dataset.nfTab;
+    document.querySelectorAll('.nf-tab-btn').forEach(b => b.classList.toggle('active', b === nfTabBtn));
+    renderNFPendentes();
     return;
   }
 
