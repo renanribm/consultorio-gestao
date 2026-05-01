@@ -314,21 +314,29 @@ function calcInativacaoSugestoes() {
   const cutoff = new Date(todayStr);
   cutoff.setDate(cutoff.getDate() - DIAS);
   const cutoffStr = cutoff.toISOString().split('T')[0];
-  return Object.entries(patLastConsult)
+
+  const comConsulta = Object.entries(patLastConsult)
     .filter(([patId, lastDate]) => {
       const pac = S.data.patients.find(p => p.id === patId);
       if (!pac || pac.status !== 'ativo') return false;
-      // Usa o máximo entre última consulta e data do "manter ativo" como referência
       const ref = (pac.manterAtivoDesde && pac.manterAtivoDesde > lastDate)
-        ? pac.manterAtivoDesde
-        : lastDate;
+        ? pac.manterAtivoDesde : lastDate;
       return ref <= cutoffStr;
     })
     .map(([patId, lastDate]) => {
       const pac = S.data.patients.find(p => p.id === patId);
-      return { patId, lastDate, name: pac?.name || '—', manterAtivoDesde: pac?.manterAtivoDesde || null };
+      return { patId, lastDate, name: pac?.name || '—', manterAtivoDesde: pac?.manterAtivoDesde || null, neverAttended: false };
+    });
+
+  const semConsulta = S.data.patients
+    .filter(p => {
+      if (p.status !== 'ativo' || patLastConsult[p.id]) return false;
+      if (p.manterAtivoDesde && p.manterAtivoDesde > cutoffStr) return false;
+      return true;
     })
-    ;
+    .map(p => ({ patId: p.id, lastDate: null, name: p.name || '—', manterAtivoDesde: p.manterAtivoDesde || null, neverAttended: true }));
+
+  return [...comConsulta, ...semConsulta];
 }
 
 function setCount(id, n) {
@@ -1671,8 +1679,8 @@ function renderInativacaoSugestoes() {
   const todayStr = today();
   const lista = calcInativacaoSugestoes()
     .sort((a, b) => S.inativacaoSort === 'asc'
-      ? a.lastDate.localeCompare(b.lastDate)
-      : b.lastDate.localeCompare(a.lastDate));
+      ? (a.lastDate || '').localeCompare(b.lastDate || '')
+      : (b.lastDate || '').localeCompare(a.lastDate || ''));
   const pill = el('inativacao-count-pill');
   if (pill) pill.textContent = lista.length;
   setCount('badge-inativacao', lista.length);
@@ -1681,9 +1689,14 @@ function renderInativacaoSugestoes() {
     return;
   }
   container.innerHTML = lista.map(p => {
-    const diasRef = p.manterAtivoDesde && p.manterAtivoDesde > p.lastDate
-      ? daysBetween(p.manterAtivoDesde, todayStr)
-      : daysBetween(p.lastDate, todayStr);
+    const diasRef = (!p.neverAttended)
+      ? (p.manterAtivoDesde && p.manterAtivoDesde > p.lastDate
+        ? daysBetween(p.manterAtivoDesde, todayStr)
+        : daysBetween(p.lastDate, todayStr))
+      : 0;
+    const metaText = p.neverAttended
+      ? 'Nunca atendido'
+      : `Última consulta: ${fmtDate(p.lastDate)} · ${diasRef} dias sem retorno`;
     const mantidoInfo = p.manterAtivoDesde
       ? `<div class="inativacao-item-meta" style="color:var(--text-muted)">Renovado em: ${fmtDate(p.manterAtivoDesde)}</div>`
       : '';
@@ -1693,7 +1706,7 @@ function renderInativacaoSugestoes() {
         <div class="inativacao-item-name">
           <span class="patient-link" data-patient="${p.patId}">${esc(p.name)}</span>
         </div>
-        <div class="inativacao-item-meta">Última consulta: ${fmtDate(p.lastDate)} · ${diasRef} dias sem retorno</div>
+        <div class="inativacao-item-meta">${metaText}</div>
         ${mantidoInfo}
       </div>
       <div class="inativacao-item-actions">
