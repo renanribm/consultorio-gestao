@@ -405,10 +405,8 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .sec-card { padding: 0; }
 .sec-card .card-header { padding: 18px 22px 16px; }
 .sec-card-wide { grid-column: 1 / -1; }
-.sec-card-tall { grid-row: span 2; display: flex; flex-direction: column; }
+.sec-card-tall { grid-row: span 2; display: flex; flex-direction: column; min-height: 540px; }
 .sec-card-tall .sec-scrollable { flex: 1; overflow-y: auto; min-height: 0; }
-.sec-card-bottom { max-width: none; }
-.notas-list-bottom { max-height: 180px; overflow-y: auto; }
 
 .sec-form { padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
 .form-action-wrap { margin-top: 8px; }

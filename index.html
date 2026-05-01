@@ -323,7 +323,6 @@
             <h2 class="view-title">Consultas</h2>
             <p class="view-subtitle">Todas as consultas e valores recebidos ou a receber</p>
           </div>
-          <button class="btn btn-primary" id="btn-novo-rec">+ Nova Consulta</button>
         </div>
         <div class="card table-card">
           <div class="table-toolbar">
@@ -452,64 +451,15 @@
             </div>
           </div>
 
-          <!-- Consulta do Dia -->
+          <!-- Anotações Internas -->
           <div class="card sec-card">
             <div class="card-header">
-              <div>
-                <h3>Nova Consulta</h3>
-                <p class="card-subtitle">Preencha para adicionar ao histórico de pagamentos</p>
-              </div>
+              <h3>Anotações Internas</h3>
+              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
             </div>
-            <form id="form-rapido" autocomplete="off" class="sec-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="r-data">Data</label>
-                  <input type="date" id="r-data" required>
-                </div>
-                <div class="form-group">
-                  <label for="r-paciente">Paciente</label>
-                  <div class="autocomplete-wrap">
-                    <input type="text" id="r-paciente" required placeholder="Buscar paciente…" autocomplete="off">
-                    <input type="hidden" id="r-paciente-id">
-                    <div class="autocomplete-list hidden" id="r-paciente-list"></div>
-                  </div>
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="r-tipo">Modalidade</label>
-                  <select id="r-tipo">
-                    <option value="presencial" selected>Presencial</option>
-                    <option value="teleconsulta">Teleconsulta</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="r-valor">Valor (R$)</label>
-                  <input type="number" id="r-valor" step="0.01" min="0" placeholder="0,00">
-                </div>
-              </div>
-              <div class="form-row">
-                <div class="form-group">
-                  <label for="r-status">Status</label>
-                  <select id="r-status">
-                    <option value="pix">Recebido PIX</option>
-                    <option value="pendente">Pendente</option>
-                    <option value="gratuito">Gratuito</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label for="r-nf">Nota Fiscal</label>
-                  <select id="r-nf">
-                    <option value="pendente">Pendente</option>
-                    <option value="emitida">Emitida</option>
-                    <option value="isenta">Isenta</option>
-                  </select>
-                </div>
-              </div>
-              <div class="form-action-wrap">
-                <button type="submit" class="btn btn-primary btn-full">Registrar Consulta</button>
-              </div>
-            </form>
+            <div class="notas-list" id="notas-list">
+              <div class="empty-state">Nenhuma anotação.</div>
+            </div>
           </div>
 
           <!-- Alerta de Retorno -->
@@ -542,17 +492,6 @@
             </div>
             <div class="nf-list sec-scrollable" id="inativacao-list">
               <div class="empty-state">Nenhuma sugestão de inativação.</div>
-            </div>
-          </div>
-
-          <!-- Anotações Internas -->
-          <div class="card sec-card sec-card-wide sec-card-bottom">
-            <div class="card-header">
-              <h3>Anotações Internas</h3>
-              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
-            </div>
-            <div class="notas-list notas-list-bottom" id="notas-list">
-              <div class="empty-state">Nenhuma anotação.</div>
             </div>
           </div>
 

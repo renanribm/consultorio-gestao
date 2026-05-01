@@ -1157,7 +1157,6 @@ function renderPacienteDetalhe(patientId) {
 // ─────────────────────────────────────────────────────────────────────────────
 // RECEBIMENTOS VIEW
 // ─────────────────────────────────────────────────────────────────────────────
-el('btn-novo-rec').addEventListener('click', () => openModalRec());
 
 el('form-rec').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -1461,25 +1460,6 @@ function updateInadimToolbar() {
 // ─────────────────────────────────────────────────────────────────────────────
 // SECRETARIA
 // ─────────────────────────────────────────────────────────────────────────────
-el('form-rapido').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const status = el('r-status').value;
-  const data = {
-    date:            el('r-data').value,
-    patient:         el('r-paciente').value.trim(),
-    patientId:       el('r-paciente-id').value || null,
-    consultationType:el('r-tipo').value,
-    value:           parseFloat(el('r-valor').value) || 0,
-    status,
-    invoiceStatus:   status === 'gratuito' ? 'isenta' : el('r-nf').value,
-    notes:           '',
-  };
-  await saveRecebimento(data);
-  el('form-rapido').reset();
-  el('r-data').value = today();
-  el('r-paciente-id').value = '';
-  renderSecretaria();
-});
 
 el('btn-nova-nota').addEventListener('click', () => openModalNota());
 
@@ -1611,7 +1591,6 @@ function renderSecretaria() {
   renderRetornoAlert();
   renderInativacaoSugestoes();
   renderNotas();
-  if (!el('r-data').value) el('r-data').value = today();
 }
 
 function calcRetornoPatients() {
@@ -2976,4 +2955,3 @@ el('toast-undo').addEventListener('click', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 applyPreset('mes');
 setupAutocomplete('rec-paciente', 'rec-paciente-list', 'rec-paciente-id');
-setupAutocomplete('r-paciente',   'r-paciente-list',   'r-paciente-id');
