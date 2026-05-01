@@ -1667,79 +1667,6 @@ function calcRetornoPatients() {
     });
 }
 
-function retornoDebugReport() {
-  const todayStr = today();
-  const completedStatuses = new Set(['cp', 'at', 'co']);
-
-  const cutoff = new Date(todayStr);
-  cutoff.setDate(cutoff.getDate() - 20);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
-
-  // status distintos
-  const statusCounts = {};
-  S.data.consultations.forEach(c => {
-    statusCounts[c.status || '(vazio)'] = (statusCounts[c.status || '(vazio)'] || 0) + 1;
-  });
-
-  // passo 1: ultima consulta por paciente (sem filtro de status)
-  const patLastAll = {};
-  S.data.consultations.forEach(c => {
-    if (!c.patientId || !c.date || c.date > todayStr) return;
-    if (!patLastAll[c.patientId] || c.date > patLastAll[c.patientId])
-      patLastAll[c.patientId] = c.date;
-  });
-
-  // passo 2: apenas completedStatuses
-  const patLastCompleted = {};
-  S.data.consultations.forEach(c => {
-    if (!c.patientId || !c.date || c.date > todayStr) return;
-    if (!completedStatuses.has(c.status)) return;
-    if (!patLastCompleted[c.patientId] || c.date > patLastCompleted[c.patientId])
-      patLastCompleted[c.patientId] = c.date;
-  });
-
-  // passo 3: após cutoff (20 dias)
-  const aposCorte = Object.entries(patLastCompleted)
-    .filter(([, d]) => d <= cutoffStr);
-
-  // passo 4: sem consulta futura
-  const hasFuture = new Set();
-  S.data.consultations.forEach(c => {
-    if (c.patientId && c.date >= todayStr) hasFuture.add(c.patientId);
-  });
-  const semFuturo = aposCorte.filter(([id]) => !hasFuture.has(id));
-
-  // passo 5: apenas ativos
-  const final = semFuturo.filter(([id]) => {
-    const p = S.data.patients.find(p => p.id === id);
-    return p && p.status === 'ativo';
-  });
-
-  const lines = [
-    `📅 Hoje: ${todayStr}`,
-    `📅 Corte (20 dias): ${cutoffStr}`,
-    '',
-    `📋 Total de consultas: ${S.data.consultations.length}`,
-    `📋 Status distintos encontrados:`,
-    ...Object.entries(statusCounts).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`   "${s}": ${n}`),
-    '',
-    `👥 Pacientes com alguma consulta passada (qualquer status): ${Object.keys(patLastAll).length}`,
-    `👥 Após filtro de status completados (cp/at/co): ${Object.keys(patLastCompleted).length}`,
-    `👥 Após corte de 20 dias: ${aposCorte.length}`,
-    `👥 Após remover quem tem consulta futura: ${semFuturo.length}`,
-    `👥 Após filtrar apenas ativos (resultado final): ${final.length}`,
-    '',
-    final.length
-      ? `✅ Pacientes na lista:\n${final.map(([id, d]) => {
-          const p = S.data.patients.find(p => p.id === id);
-          const days = daysBetween(d, todayStr);
-          return `   ${p?.name || id} — última: ${d} (${days} dias)`;
-        }).join('\n')}`
-      : '⚠️ Nenhum paciente passou todos os filtros.',
-  ];
-  return lines.join('\n');
-}
-
 function renderRetornoAlert() {
   const container = el('retorno-list');
   if (!container) return;
@@ -2809,18 +2736,6 @@ document.addEventListener('click', (e) => {
   else if (action === 'cd-register-payment') {
     const ev = S.data.consultations.find(c => c.id === btn.dataset.eventId);
     if (ev) { closeModal('modal-consult-detail'); openModalRec(null, { date: ev.date, patientName: ev.patientName, patientId: ev.patientId, consultationType: ev.consultationType }); }
-  }
-  else if (action === 'retorno-debug-toggle') {
-    const panel = el('retorno-debug-panel');
-    if (!panel) return;
-    if (panel.style.display === 'none') {
-      panel.textContent = retornoDebugReport();
-      panel.style.display = 'block';
-      btn.textContent = '✖ Fechar debug';
-    } else {
-      panel.style.display = 'none';
-      btn.textContent = '🔍 Debug';
-    }
   }
   else if (action === 'retorno-undo') {
     (async () => {
