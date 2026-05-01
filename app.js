@@ -75,7 +75,13 @@ onAuthStateChanged(auth, async (user) => {
     S.role = role;
     applyRoleUI();
     await loadAll();
-    navigateTo(S.role === 'secretaria' ? 'secretaria' : 'dashboard');
+    const fromURL = viewFromURL();
+    const defaultView = S.role === 'secretaria' ? 'secretaria' : 'dashboard';
+    if (fromURL?.view === 'paciente-detalhe' && fromURL.patientId) {
+      navigateToPatient(fromURL.patientId, { replace: true });
+    } else {
+      navigateTo(fromURL?.view || defaultView, { replace: true });
+    }
     el('loading-overlay').classList.add('hidden');
   } else {
     unsubscribeAll();
@@ -158,9 +164,10 @@ el('btn-mobile-menu').addEventListener('click', () => {
 el('sidebar-backdrop').addEventListener('click', closeMobileDrawer);
 el('btn-mobile-logout').addEventListener('click', () => signOut(auth));
 
-function navigateTo(view) {
+function navigateTo(view, { pushHistory = true, replace = false } = {}) {
   if (S.role === 'secretaria' && (view === 'dashboard' || view === 'dre')) view = 'secretaria';
   S.view = view;
+  if (pushHistory) history[replace ? 'replaceState' : 'pushState']({ view }, '', '/' + view);
   document.querySelectorAll('section.view').forEach(s => s.classList.add('hidden'));
   const target = el('view-' + view);
   if (target) target.classList.remove('hidden');
@@ -169,15 +176,41 @@ function navigateTo(view) {
   renderView(view);
 }
 
-function navigateToPatient(patientId) {
+function navigateToPatient(patientId, { pushHistory = true, replace = false } = {}) {
   S.currentPatient = patientId;
   S.view = 'paciente-detalhe';
+  if (pushHistory) history[replace ? 'replaceState' : 'pushState']({ view: 'paciente-detalhe', patientId }, '', `/pacientes/${patientId}`);
   document.querySelectorAll('section.view').forEach(s => s.classList.add('hidden'));
   el('view-paciente-detalhe').classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   el('filter-bar').classList.add('hidden');
   renderPacienteDetalhe(patientId);
 }
+
+function viewFromURL() {
+  const path = location.pathname.replace(/^\//, '').replace(/\/$/, '');
+  if (path.startsWith('pacientes/')) {
+    const patientId = path.slice('pacientes/'.length);
+    if (patientId) return { view: 'paciente-detalhe', patientId };
+  }
+  const valid = ['dashboard','secretaria','inadimplencia','pacientes','agenda','recebimentos','despesas','dre','import'];
+  if (valid.includes(path)) return { view: path };
+  return null;
+}
+
+window.addEventListener('popstate', e => {
+  if (!S.user) return;
+  const state = e.state;
+  if (!state) {
+    navigateTo(S.role === 'secretaria' ? 'secretaria' : 'dashboard', { pushHistory: false });
+    return;
+  }
+  if (state.view === 'paciente-detalhe' && state.patientId) {
+    navigateToPatient(state.patientId, { pushHistory: false });
+  } else {
+    navigateTo(state.view || (S.role === 'secretaria' ? 'secretaria' : 'dashboard'), { pushHistory: false });
+  }
+});
 
 function renderView(view) {
   switch (view) {
