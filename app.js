@@ -642,6 +642,7 @@ function renderDashboard() {
   if (pendNF.length) setText('alert-nf-count', `${pendNF.length} nota${pendNF.length>1?'s fiscais':' fiscal'}`);
 
   if (S.filter.start) setText('dash-period', `${fmtDate(S.filter.start)} → ${fmtDate(S.filter.end)}`);
+  renderAniversariantes('alert-aniversario', 'alert-aniversario-text');
   renderMensalChart();
   renderRecent();
 }
@@ -1605,6 +1606,30 @@ function renderSecretaria() {
   renderRetornoAlert();
   renderInativacaoSugestoes();
   renderNotas();
+  renderAniversariantes('aniversario-banner-sec', 'aniversario-sec-text');
+}
+
+function calcAniversariantes() {
+  const todayStr = today();
+  const [, mm, dd] = todayStr.split('-');
+  return S.data.patients.filter(p =>
+    p.status === 'ativo' && p.birthDate &&
+    p.birthDate.slice(5, 7) === mm &&
+    p.birthDate.slice(8, 10) === dd
+  );
+}
+
+function renderAniversariantes(bannerId, textId) {
+  const banner = el(bannerId);
+  if (!banner) return;
+  const lista = calcAniversariantes();
+  if (!lista.length) { banner.classList.add('hidden'); return; }
+  const nomes = lista.map(p => `<a href="#" class="alert-link patient-link" data-patient="${p.id}">${esc(p.name)}</a>`).join(', ');
+  const txt = lista.length === 1
+    ? `Aniversário hoje: ${nomes}`
+    : `${lista.length} aniversariantes hoje: ${nomes}`;
+  el(textId).innerHTML = txt;
+  banner.classList.remove('hidden');
 }
 
 function calcRetornoPatients() {
