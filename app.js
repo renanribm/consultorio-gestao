@@ -1635,7 +1635,7 @@ function calcRetornoPatients() {
   });
 
   const cutoff = new Date(todayStr);
-  cutoff.setDate(cutoff.getDate() - 30);
+  cutoff.setDate(cutoff.getDate() - 20);
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
   return Object.entries(patLastConsult)
@@ -1679,7 +1679,7 @@ function renderRetornoAlert() {
     .filter(p => !p.needsContact)
     .sort((a, b) => (a.nextContact || '').localeCompare(b.nextContact || ''));
   const novos      = todos
-    .filter(p => p.needsContact && p.attempts === 0 && p.days < 37)
+    .filter(p => p.needsContact && p.attempts === 0 && p.days < 37 && p.days >= 20)
     .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
 
   const pill = el('retorno-count-pill');
@@ -1756,9 +1756,10 @@ function renderRetornoAlert() {
       ${p.phone ? `<div class="retorno-item-phone">${esc(p.phone)}</div>` : ''}
       ${contextLine}
       ${inativBlock}
-      <button class="btn btn-sm btn-outline retorno-contact-btn" data-action="retorno-form-open" data-id="${p.patId}">
-        Registrar contato
-      </button>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+        <button class="btn btn-sm btn-outline" data-action="retorno-form-open" data-id="${p.patId}">Registrar contato</button>
+        ${mode === 'waiting' ? `<button class="btn btn-sm btn-outline" style="color:var(--text-muted)" data-action="retorno-undo" data-id="${p.patId}">Desfazer contato</button>` : ''}
+      </div>
       ${formBlock}
     </div>`;
   };
@@ -2742,6 +2743,19 @@ document.addEventListener('click', (e) => {
   else if (action === 'cd-register-payment') {
     const ev = S.data.consultations.find(c => c.id === btn.dataset.eventId);
     if (ev) { closeModal('modal-consult-detail'); openModalRec(null, { date: ev.date, patientName: ev.patientName, patientId: ev.patientId, consultationType: ev.consultationType }); }
+  }
+  else if (action === 'retorno-undo') {
+    (async () => {
+      const pac = S.data.patients.find(p => p.id === id);
+      if (!pac) return;
+      showLoading();
+      try {
+        await updateDoc(doc(db, 'patients', id), { retornoFollowUp: deleteField(), updatedAt: serverTimestamp() });
+        pac.retornoFollowUp = null;
+        renderRetornoAlert();
+        showToast('Contato desfeito.', 'success');
+      } catch (err) { handleErr(err); } finally { hideLoading(); }
+    })();
   }
   else if (action === 'retorno-form-open') {
     const form = el(`retorno-form-${id}`);
