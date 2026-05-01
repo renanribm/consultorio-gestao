@@ -3110,6 +3110,74 @@ function waBtn(phone) {
   const num = digits.startsWith('55') ? digits : '55' + digits;
   return `<a href="https://wa.me/${num}" target="_blank" rel="noopener" class="wa-btn" title="Abrir no WhatsApp"><svg viewBox="0 0 24 24" width="16" height="16" fill="#25d366" style="display:block"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.117.554 4.104 1.523 5.827L.057 23.428a.5.5 0 00.514.572l5.762-1.512A11.943 11.943 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.9a9.9 9.9 0 01-5.031-1.371l-.361-.214-3.741.981.999-3.648-.235-.374A9.862 9.862 0 012.1 12C2.1 6.534 6.534 2.1 12 2.1S21.9 6.534 21.9 12 17.466 21.9 12 21.9z"/></svg></a>`;
 }
+function downloadCSV(filename, headers, rows) {
+  const esc = v => {
+    const s = (v == null ? '' : String(v)).replace(/"/g, '""');
+    return /[",\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [headers, ...rows].map(row => row.map(esc).join(','));
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportRecebimentos() {
+  const recs = filteredRec();
+  const headers = ['Data','Paciente','Modalidade','Valor (R$)','Status','NF Status','Número NF','Observações'];
+  const rows = recs.map(r => [
+    fmtDate(r.date),
+    r.patient || '',
+    labels.consultationType[r.consultationType] || r.consultationType || '',
+    (r.value || 0).toFixed(2).replace('.', ','),
+    labels.status[r.status] || r.status || '',
+    labels.invoiceStatus[r.invoiceStatus] || r.invoiceStatus || '',
+    r.invoiceNumber || '',
+    r.notes || '',
+  ]);
+  downloadCSV(`consultas_${today()}.csv`, headers, rows);
+}
+
+function exportDespesas() {
+  const desp = filteredDesp();
+  const headers = ['Data','Descrição','Categoria','Recorrência','Valor (R$)'];
+  const rows = desp.map(d => [
+    fmtDate(d.date),
+    d.description || '',
+    labels.expenseCategory[d.category] || d.category || '',
+    labels.recurrence[d.recurrence] || d.recurrence || '',
+    (d.value || 0).toFixed(2).replace('.', ','),
+  ]);
+  downloadCSV(`despesas_${today()}.csv`, headers, rows);
+}
+
+function exportPacientes() {
+  const q = el('search-pac').value.toLowerCase();
+  const pacs = S.data.patients
+    .filter(p => !q || (p.name || '').toLowerCase().includes(q))
+    .filter(p => S.pacStatusFilter === 'todos' || (p.status || 'ativo') === S.pacStatusFilter);
+  const headers = ['Nome','Telefone','Telefone 2','E-mail','Data Nascimento','Status','CPF','Sexo','Como chegou','Observações'];
+  const genderMap = { m: 'Masculino', f: 'Feminino', o: 'Outro' };
+  const rows = pacs.map(p => [
+    p.name || '',
+    p.phone || '',
+    p.phone2 || '',
+    p.email || '',
+    p.birthDate ? fmtDate(p.birthDate) : '',
+    labels.patientStatus[p.status] || p.status || '',
+    p.cpf || '',
+    genderMap[p.gender] || '',
+    p.indication || '',
+    p.notes || '',
+  ]);
+  downloadCSV(`pacientes_${today()}.csv`, headers, rows);
+}
+
+el('btn-export-rec').addEventListener('click', exportRecebimentos);
+el('btn-export-desp').addEventListener('click', exportDespesas);
+el('btn-export-pac').addEventListener('click', exportPacientes);
+
 function daysBetween(d1,d2) { return Math.max(0,Math.round((new Date(d2)-new Date(d1))/86400000)); }
 function dateAddDays(dateStr,n) { const d=new Date(dateStr); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
 function sumWhere(arr,pred) { return arr.filter(pred).reduce((s,r)=>s+(r.value||0),0); }

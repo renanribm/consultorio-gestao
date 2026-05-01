@@ -220,7 +220,10 @@
       <section class="view hidden" id="view-pacientes">
         <div class="view-header">
           <h2 class="view-title">Pacientes</h2>
-          <button class="btn btn-primary" id="btn-novo-paciente">+ Novo Paciente</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline nav-medica-only hidden" id="btn-export-pac">↓ Exportar CSV</button>
+            <button class="btn btn-primary" id="btn-novo-paciente">+ Novo Paciente</button>
+          </div>
         </div>
         <div class="dup-section hidden" id="dup-section">
           <div class="dup-section-header">
@@ -343,6 +346,7 @@
             <h2 class="view-title">Consultas</h2>
             <p class="view-subtitle">Todas as consultas e valores recebidos ou a receber</p>
           </div>
+          <button class="btn btn-outline nav-medica-only hidden" id="btn-export-rec">↓ Exportar CSV</button>
         </div>
         <div class="card table-card">
           <div class="table-toolbar">
@@ -374,7 +378,10 @@
       <section class="view hidden" id="view-despesas">
         <div class="view-header">
           <h2 class="view-title">Despesas</h2>
-          <button class="btn btn-primary" id="btn-nova-desp">+ Nova Despesa</button>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline nav-medica-only hidden" id="btn-export-desp">↓ Exportar CSV</button>
+            <button class="btn btn-primary" id="btn-nova-desp">+ Nova Despesa</button>
+          </div>
         </div>
         <div class="card table-card">
           <div class="table-toolbar">
