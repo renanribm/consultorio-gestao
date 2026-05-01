@@ -36,6 +36,7 @@ const S = {
   nfSelected:      new Set(),
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
+  recSort:         { col: 'date', dir: 'desc' },
   calendarYear:    new Date().getFullYear(),
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
@@ -346,15 +347,16 @@ async function saveRecebimento(data, id = null) {
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
-async function deleteRec(id) {
-  if (!confirm('Excluir esta consulta?')) return;
-  showLoading();
-  try {
-    await deleteDoc(doc(db, 'recebimentos', id));
-    await reloadCollection('recebimentos');
-    updateBadges(); renderView(S.view);
-    showToast('Recebimento excluído.', 'info');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+function deleteRec(id) {
+  showConfirm('Excluir esta consulta permanentemente?', async () => {
+    showLoading();
+    try {
+      await deleteDoc(doc(db, 'recebimentos', id));
+      await reloadCollection('recebimentos');
+      updateBadges(); renderView(S.view);
+      showToast('Recebimento excluído.', 'info');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Excluir consulta' });
 }
 
 async function markReceived(id) {
@@ -385,14 +387,15 @@ async function saveDespesa(data, id = null) {
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
-async function deleteDesp(id) {
-  if (!confirm('Excluir esta despesa?')) return;
-  showLoading();
-  try {
-    await deleteDoc(doc(db, 'despesas', id));
-    await reloadCollection('despesas'); renderView(S.view);
-    showToast('Despesa excluída.', 'info');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+function deleteDesp(id) {
+  showConfirm('Excluir esta despesa permanentemente?', async () => {
+    showLoading();
+    try {
+      await deleteDoc(doc(db, 'despesas', id));
+      await reloadCollection('despesas'); renderView(S.view);
+      showToast('Despesa excluída.', 'info');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Excluir despesa' });
 }
 
 // ── Notas ─────────────────────────────────────────────────
@@ -406,14 +409,15 @@ async function saveNota(data, id = null) {
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
-async function deleteNota(id) {
-  if (!confirm('Excluir esta anotação?')) return;
-  showLoading();
-  try {
-    await deleteDoc(doc(db, 'notas', id));
-    await reloadCollection('notas'); renderSecretaria();
-    showToast('Anotação excluída.', 'info');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+function deleteNota(id) {
+  showConfirm('Excluir esta anotação permanentemente?', async () => {
+    showLoading();
+    try {
+      await deleteDoc(doc(db, 'notas', id));
+      await reloadCollection('notas'); renderSecretaria();
+      showToast('Anotação excluída.', 'info');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Excluir anotação' });
 }
 
 // ── Pacientes ─────────────────────────────────────────────
@@ -427,14 +431,15 @@ async function savePatient(data, id = null) {
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
-async function deletePatient(id) {
-  if (!confirm('Excluir este paciente? O histórico de consultas será mantido.')) return;
-  showLoading();
-  try {
-    await deleteDoc(doc(db, 'patients', id));
-    await reloadCollection('patients'); renderPacientes();
-    showToast('Paciente excluído.', 'info');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+function deletePatient(id) {
+  showConfirm('Excluir este paciente? O histórico de consultas será mantido.', async () => {
+    showLoading();
+    try {
+      await deleteDoc(doc(db, 'patients', id));
+      await reloadCollection('patients'); renderPacientes();
+      showToast('Paciente excluído.', 'info');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Excluir paciente' });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -446,22 +451,22 @@ async function markAllPastNFsEmitted() {
     r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayStr
   );
   if (!targets.length) { showToast('Nenhuma NF pendente até hoje.', 'info'); return; }
-  if (!confirm(`Marcar ${targets.length} nota${targets.length > 1 ? 's fiscais' : ' fiscal'} como emitida${targets.length > 1 ? 's' : ''}?\n\nEsta ação não pode ser desfeita.`)) return;
-
-  showLoading();
-  try {
-    for (let i = 0; i < targets.length; i += 400) {
-      const batch = writeBatch(db);
-      targets.slice(i, i + 400).forEach(r => {
-        batch.update(doc(db, 'recebimentos', r.id), { invoiceStatus: 'emitida', updatedAt: serverTimestamp() });
-      });
-      await batch.commit();
-    }
-    await reloadCollection('recebimentos');
-    updateBadges();
-    renderView(S.view);
-    showToast(`${targets.length} NF${targets.length > 1 ? 's marcadas' : ' marcada'} como emitida${targets.length > 1 ? 's' : ''}!`, 'success');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+  showConfirm(`Marcar ${targets.length} nota${targets.length > 1 ? 's fiscais' : ' fiscal'} como emitida${targets.length > 1 ? 's' : ''}? Esta ação não pode ser desfeita.`, async () => {
+    showLoading();
+    try {
+      for (let i = 0; i < targets.length; i += 400) {
+        const batch = writeBatch(db);
+        targets.slice(i, i + 400).forEach(r => {
+          batch.update(doc(db, 'recebimentos', r.id), { invoiceStatus: 'emitida', updatedAt: serverTimestamp() });
+        });
+        await batch.commit();
+      }
+      await reloadCollection('recebimentos');
+      updateBadges();
+      renderView(S.view);
+      showToast(`${targets.length} NF${targets.length > 1 ? 's marcadas' : ' marcada'} como emitida${targets.length > 1 ? 's' : ''}!`, 'success');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Marcar NFs como emitidas', okLabel: 'Marcar emitidas' });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -550,46 +555,38 @@ async function mergePacientes(keepId, dropId) {
   const dropPac = S.data.patients.find(p => p.id === dropId);
   if (!keepPac || !dropPac) return;
 
-  if (!confirm(`Manter "${keepPac.name}" e excluir "${dropPac.name}"?\n\nTodos os recebimentos e agendamentos serão transferidos. Esta ação não pode ser desfeita.`)) return;
-
-  showLoading();
-  try {
-    const recsToMove    = S.data.recebimentos.filter(r => r.patientId === dropId);
-    const consultsToMove = S.data.consultations.filter(c => c.patientId === dropId);
-
-    const updates = [
-      ...recsToMove.map(r    => ({ col: 'recebimentos',  id: r.id, data: { patientId: keepId, patient:     keepPac.name } })),
-      ...consultsToMove.map(c => ({ col: 'consultations', id: c.id, data: { patientId: keepId, patientName: keepPac.name } })),
-    ];
-
-    for (let i = 0; i < updates.length; i += 400) {
-      const batch = writeBatch(db);
-      updates.slice(i, i + 400).forEach(u =>
-        batch.update(doc(db, u.col, u.id), { ...u.data, updatedAt: serverTimestamp() })
-      );
-      await batch.commit();
-    }
-
-    // Carry over phone2 from the deleted patient if it adds info
-    const extras = {};
-    if (dropPac.phone && dropPac.phone !== keepPac.phone && !keepPac.phone2) extras.phone2 = dropPac.phone;
-
-    if (Object.keys(extras).length) {
-      await updateDoc(doc(db, 'patients', keepId), { ...extras, updatedAt: serverTimestamp() });
-    }
-
-    await deleteDoc(doc(db, 'patients', dropId));
-
-    await Promise.all([
-      reloadCollection('patients'),
-      reloadCollection('recebimentos'),
-      reloadCollection('consultations'),
-    ]);
-
-    updateBadges();
-    renderPacientes();
-    showToast('Pacientes mesclados com sucesso!', 'success');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+  showConfirm(`Manter "${keepPac.name}" e excluir "${dropPac.name}"? Todos os recebimentos e agendamentos serão transferidos. Esta ação não pode ser desfeita.`, async () => {
+    showLoading();
+    try {
+      const recsToMove    = S.data.recebimentos.filter(r => r.patientId === dropId);
+      const consultsToMove = S.data.consultations.filter(c => c.patientId === dropId);
+      const updates = [
+        ...recsToMove.map(r    => ({ col: 'recebimentos',  id: r.id, data: { patientId: keepId, patient:     keepPac.name } })),
+        ...consultsToMove.map(c => ({ col: 'consultations', id: c.id, data: { patientId: keepId, patientName: keepPac.name } })),
+      ];
+      for (let i = 0; i < updates.length; i += 400) {
+        const batch = writeBatch(db);
+        updates.slice(i, i + 400).forEach(u =>
+          batch.update(doc(db, u.col, u.id), { ...u.data, updatedAt: serverTimestamp() })
+        );
+        await batch.commit();
+      }
+      const extras = {};
+      if (dropPac.phone && dropPac.phone !== keepPac.phone && !keepPac.phone2) extras.phone2 = dropPac.phone;
+      if (Object.keys(extras).length) {
+        await updateDoc(doc(db, 'patients', keepId), { ...extras, updatedAt: serverTimestamp() });
+      }
+      await deleteDoc(doc(db, 'patients', dropId));
+      await Promise.all([
+        reloadCollection('patients'),
+        reloadCollection('recebimentos'),
+        reloadCollection('consultations'),
+      ]);
+      updateBadges();
+      renderPacientes();
+      showToast('Pacientes mesclados com sucesso!', 'success');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Mesclar pacientes', okLabel: 'Mesclar' });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1166,10 +1163,38 @@ el('form-rec').addEventListener('submit', async (e) => {
 
 el('search-rec').addEventListener('input', renderRecebimentos);
 
+el('thead-rec').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th) return;
+  const col = th.dataset.sort;
+  if (S.recSort.col === col) S.recSort.dir = S.recSort.dir === 'asc' ? 'desc' : 'asc';
+  else { S.recSort.col = col; S.recSort.dir = 'asc'; }
+  renderRecebimentos();
+});
+
 function renderRecebimentos() {
   let recs = filteredRec();
   const q  = el('search-rec').value.toLowerCase();
   if (q) recs = recs.filter(r => (r.patient||'').toLowerCase().includes(q));
+
+  const { col, dir } = S.recSort;
+  const mult = dir === 'asc' ? 1 : -1;
+  recs.sort((a, b) => {
+    switch (col) {
+      case 'date':            return mult * (a.date||'').localeCompare(b.date||'');
+      case 'patient':         return mult * (a.patient||'').localeCompare(b.patient||'', 'pt-BR', { sensitivity: 'base' });
+      case 'consultationType':return mult * (a.consultationType||'').localeCompare(b.consultationType||'');
+      case 'value':           return mult * ((a.value||0) - (b.value||0));
+      case 'status':          return mult * (a.status||'').localeCompare(b.status||'');
+      case 'invoiceStatus':   return mult * (a.invoiceStatus||'').localeCompare(b.invoiceStatus||'');
+      default:                return 0;
+    }
+  });
+
+  document.querySelectorAll('#thead-rec th[data-sort]').forEach(th => {
+    if (th.dataset.sort === col) th.setAttribute('data-dir', dir);
+    else th.removeAttribute('data-dir');
+  });
 
   const total    = recs.reduce((s,r)=>s+(r.value||0),0);
   const recebido = recs.filter(r=>r.status==='pix').reduce((s,r)=>s+(r.value||0),0);
@@ -1468,21 +1493,22 @@ el('btn-nf-bulk-emit').addEventListener('click', async () => {
   if (!S.nfSelected.size) return;
   const ids   = [...S.nfSelected];
   const count = ids.length;
-  if (!confirm(`Marcar ${count} nota${count > 1 ? 's fiscais' : ' fiscal'} como emitida${count > 1 ? 's' : ''}?`)) return;
-  showLoading();
-  try {
-    for (let i = 0; i < ids.length; i += 400) {
-      const batch = writeBatch(db);
-      ids.slice(i, i + 400).forEach(id =>
-        batch.update(doc(db, 'recebimentos', id), { invoiceStatus: 'emitida', updatedAt: serverTimestamp() })
-      );
-      await batch.commit();
-    }
-    S.nfSelected.clear();
-    await reloadCollection('recebimentos');
-    updateBadges(); renderView(S.view);
-    showToast(`${count} NF${count > 1 ? 's marcadas' : ' marcada'} como emitida${count > 1 ? 's' : ''}!`, 'success');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+  showConfirm(`Marcar ${count} nota${count > 1 ? 's fiscais' : ' fiscal'} como emitida${count > 1 ? 's' : ''}?`, async () => {
+    showLoading();
+    try {
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(db);
+        ids.slice(i, i + 400).forEach(id =>
+          batch.update(doc(db, 'recebimentos', id), { invoiceStatus: 'emitida', updatedAt: serverTimestamp() })
+        );
+        await batch.commit();
+      }
+      S.nfSelected.clear();
+      await reloadCollection('recebimentos');
+      updateBadges(); renderView(S.view);
+      showToast(`${count} NF${count > 1 ? 's marcadas' : ' marcada'} como emitida${count > 1 ? 's' : ''}!`, 'success');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  }, { title: 'Marcar NFs como emitidas', okLabel: 'Marcar emitidas' });
 });
 
 // Inadimplência bulk selection
@@ -1493,25 +1519,29 @@ el('check-inadim-all').addEventListener('change', (e) => {
   renderInadimplencia();
 });
 
-el('btn-inadim-bulk-received').addEventListener('click', async () => {
+el('btn-inadim-bulk-received').addEventListener('click', () => {
   if (!S.inadimSelected.size) return;
   const ids   = [...S.inadimSelected];
   const count = ids.length;
-  if (!confirm(`Marcar ${count} pagamento${count > 1 ? 's' : ''} como recebido${count > 1 ? 's' : ''} via PIX?`)) return;
-  showLoading();
-  try {
-    for (let i = 0; i < ids.length; i += 400) {
-      const batch = writeBatch(db);
-      ids.slice(i, i + 400).forEach(id =>
-        batch.update(doc(db, 'recebimentos', id), { status: 'pix', updatedAt: serverTimestamp() })
-      );
-      await batch.commit();
+  showConfirm(
+    `Marcar ${count} pagamento${count > 1 ? 's' : ''} como recebido${count > 1 ? 's' : ''} via PIX?`,
+    async () => {
+      showLoading();
+      try {
+        for (let i = 0; i < ids.length; i += 400) {
+          const batch = writeBatch(db);
+          ids.slice(i, i + 400).forEach(id =>
+            batch.update(doc(db, 'recebimentos', id), { status: 'pix', updatedAt: serverTimestamp() })
+          );
+          await batch.commit();
+        }
+        S.inadimSelected.clear();
+        await reloadCollection('recebimentos');
+        updateBadges(); renderView(S.view);
+        showToast(`${count} pagamento${count > 1 ? 's marcados' : ' marcado'} como recebido${count > 1 ? 's' : ''}!`, 'success');
+      } catch (err) { handleErr(err); } finally { hideLoading(); }
     }
-    S.inadimSelected.clear();
-    await reloadCollection('recebimentos');
-    updateBadges(); renderView(S.view);
-    showToast(`${count} pagamento${count > 1 ? 's marcados' : ' marcado'} como recebido${count > 1 ? 's' : ''}!`, 'success');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
+  );
 });
 
 el('form-nota').addEventListener('submit', async (e) => {
@@ -1847,8 +1877,7 @@ el('btn-reset-all').addEventListener('click', async () => {
   const phrase = 'APAGAR TUDO';
   const typed  = window.prompt(`Esta ação é irreversível.\n\nDigite exatamente: ${phrase}`);
   if (typed !== phrase) { showToast('Cancelado.', 'info'); return; }
-  if (!confirm('Última confirmação: apagar TODOS os dados permanentemente?')) return;
-
+  showConfirm('Última confirmação: apagar TODOS os dados permanentemente?', async () => {
   el('btn-reset-all').disabled = true;
   el('btn-reset-all').textContent = 'Apagando…';
 
@@ -1884,6 +1913,7 @@ el('btn-reset-all').addEventListener('click', async () => {
     el('btn-reset-all').disabled = false;
     el('btn-reset-all').textContent = 'Apagar todos os dados';
   }
+  });
 });
 
 // IMPORTAÇÃO iCLINIC — 3 CSVs, upsert inteligente
@@ -2160,7 +2190,6 @@ async function runImport() {
           invoiceStatus:    'pendente',
           consultationType: isTele ? 'teleconsulta' : 'presencial',
           iclinicEventId:   eventId,
-          notes:            desc,
           createdAt:        serverTimestamp(),
           createdBy:        'iclinic-import',
         });
@@ -2388,46 +2417,56 @@ async function confirmPaymentImport() {
     const patId = row.manualPatientId || row.matchedPatient?.id;
     return S.data.recebimentos.some(r => r.patientId === patId && r.date === row.consultationDate);
   });
+  const doImport = async () => {
+    showLoading();
+    try {
+      for (let i = 0; i < toImport.length; i += 490) {
+        const batch = writeBatch(db);
+        toImport.slice(i, i + 490).forEach(row => {
+          const patId   = row.manualPatientId || row.matchedPatient?.id || null;
+          const patName = patId ? (S.data.patients.find(p => p.id === patId)?.name || row.patientCsvName) : row.patientCsvName;
+          const data = {
+            date:             row.consultationDate,
+            patient:          patName,
+            patientId:        patId,
+            consultationType: row.consultationType,
+            value:            row.value,
+            status:           row.status,
+            invoiceStatus:    row.invoiceStatus,
+            notes:            '',
+            importedFromCsv:  true,
+            createdAt:        serverTimestamp(),
+            createdBy:        S.user.uid,
+          };
+          if (row.paymentDate) data.paymentDate = row.paymentDate;
+          batch.set(doc(collection(db, 'recebimentos')), data);
+        });
+        await batch.commit();
+      }
+      await reloadCollection('recebimentos');
+      updateBadges();
+      const resultEl = el('payment-import-result');
+      resultEl.className = 'import-result success';
+      resultEl.innerHTML = `<strong>✓ ${toImport.length} consulta${toImport.length > 1 ? 's importadas' : ' importada'} com sucesso!</strong><br>Os dados estão disponíveis na aba <strong>Consultas</strong>.`;
+      resultEl.classList.remove('hidden');
+      el('payment-import-review').classList.add('hidden');
+      el('payment-import-actions').classList.add('hidden');
+      S.paymentImportRows = null;
+      showToast(`${toImport.length} consulta${toImport.length > 1 ? 's' : ''} importada${toImport.length > 1 ? 's' : ''}!`, 'success');
+    } catch (err) { handleErr(err); } finally { hideLoading(); }
+  };
+  const confirmImport = () => showConfirm(
+    `Importar ${toImport.length} registro${toImport.length > 1 ? 's' : ''} de consulta?`,
+    doImport, { danger: false, okLabel: 'Importar' }
+  );
   if (dups.length) {
-    if (!confirm(`${dups.length} registro${dups.length > 1 ? 's' : ''} já exist${dups.length > 1 ? 'em' : 'e'} no sistema (mesmo paciente e data). Continuar mesmo assim?`)) return;
+    showConfirm(
+      `${dups.length} registro${dups.length > 1 ? 's' : ''} já exist${dups.length > 1 ? 'em' : 'e'} no sistema (mesmo paciente e data). Continuar mesmo assim?`,
+      confirmImport
+    );
+  } else {
+    confirmImport();
   }
-  if (!confirm(`Importar ${toImport.length} registro${toImport.length > 1 ? 's' : ''} de consulta?`)) return;
-  showLoading();
-  try {
-    for (let i = 0; i < toImport.length; i += 490) {
-      const batch = writeBatch(db);
-      toImport.slice(i, i + 490).forEach(row => {
-        const patId   = row.manualPatientId || row.matchedPatient?.id || null;
-        const patName = patId ? (S.data.patients.find(p => p.id === patId)?.name || row.patientCsvName) : row.patientCsvName;
-        const data = {
-          date:             row.consultationDate,
-          patient:          patName,
-          patientId:        patId,
-          consultationType: row.consultationType,
-          value:            row.value,
-          status:           row.status,
-          invoiceStatus:    row.invoiceStatus,
-          notes:            '',
-          importedFromCsv:  true,
-          createdAt:        serverTimestamp(),
-          createdBy:        S.user.uid,
-        };
-        if (row.paymentDate) data.paymentDate = row.paymentDate;
-        batch.set(doc(collection(db, 'recebimentos')), data);
-      });
-      await batch.commit();
-    }
-    await reloadCollection('recebimentos');
-    updateBadges();
-    const resultEl = el('payment-import-result');
-    resultEl.className = 'import-result success';
-    resultEl.innerHTML = `<strong>✓ ${toImport.length} consulta${toImport.length > 1 ? 's importadas' : ' importada'} com sucesso!</strong><br>Os dados estão disponíveis na aba <strong>Consultas</strong>.`;
-    resultEl.classList.remove('hidden');
-    el('payment-import-review').classList.add('hidden');
-    el('payment-import-actions').classList.add('hidden');
-    S.paymentImportRows = null;
-    showToast(`${toImport.length} consulta${toImport.length > 1 ? 's' : ''} importada${toImport.length > 1 ? 's' : ''}!`, 'success');
-  } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
 
@@ -2734,6 +2773,17 @@ function showToast(msg, type = 'success', undoFn = null) {
 }
 function showLoading()  { el('loading-overlay').classList.remove('hidden'); }
 function hideLoading()  { el('loading-overlay').classList.add('hidden'); }
+
+function showConfirm(msg, onOk, { title = 'Confirmar ação', danger = true, okLabel = 'Confirmar' } = {}) {
+  el('confirm-title').textContent = title;
+  el('confirm-msg').textContent   = msg;
+  const okBtn = el('confirm-ok');
+  okBtn.textContent = okLabel;
+  okBtn.className   = `btn ${danger ? 'btn-danger' : 'btn-primary'}`;
+  openModal('modal-confirm');
+  okBtn.onclick = () => { closeModal('modal-confirm'); onOk(); };
+}
+el('confirm-cancel').addEventListener('click', () => closeModal('modal-confirm'));
 
 el('toast-undo').addEventListener('click', () => {
   clearTimeout(toastTimer);

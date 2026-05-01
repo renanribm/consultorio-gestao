@@ -82,8 +82,8 @@
         <a class="nav-item" data-view="secretaria" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/></svg>
           <span class="nav-label">Painel Secretária</span>
-          <span class="nav-badge hidden" id="badge-nf" style="background:var(--primary)">0</span>
-          <span class="nav-badge hidden" id="badge-retorno" style="background:var(--primary)">0</span>
+          <span class="nav-badge hidden" id="badge-nf" style="background:var(--red)">0</span>
+          <span class="nav-badge hidden" id="badge-retorno" style="background:var(--amber)">0</span>
           <span class="nav-badge hidden" id="badge-inativacao" style="background:#6b7280">0</span>
         </a>
         <a class="nav-item nav-medica-only hidden" data-view="dre" href="#">
@@ -330,11 +330,15 @@
           </div>
           <div class="table-wrap">
             <table class="data-table">
-              <thead>
+              <thead id="thead-rec">
                 <tr>
-                  <th>Data</th><th>Paciente</th><th>Tipo</th>
-                  <th class="text-right">Valor</th><th>Status</th>
-                  <th>Nota Fiscal</th><th>Obs.</th><th>Ações</th>
+                  <th class="sortable" data-sort="date">Data</th>
+                  <th class="sortable" data-sort="patient">Paciente</th>
+                  <th class="sortable" data-sort="consultationType">Tipo</th>
+                  <th class="text-right sortable" data-sort="value">Valor</th>
+                  <th class="sortable" data-sort="status">Status</th>
+                  <th class="sortable" data-sort="invoiceStatus">Nota Fiscal</th>
+                  <th>Obs.</th><th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tbody-rec">
@@ -420,7 +424,7 @@
             <div class="card-header">
               <div style="display:flex;align-items:center;gap:10px">
                 <h3>Notas Fiscais Pendentes</h3>
-                <span class="badge-pill" id="nf-count-pill">0</span>
+                <span class="badge-pill" id="nf-count-pill" style="background:var(--red)">0</span>
               </div>
             </div>
             <div class="bulk-toolbar hidden" id="nf-bulk-toolbar">
@@ -450,8 +454,8 @@
           <div class="card sec-card">
             <div class="card-header">
               <div>
-                <h3>Consulta do Dia</h3>
-                <p class="card-subtitle">Registro rápido para consultas de hoje</p>
+                <h3>Nova Consulta</h3>
+                <p class="card-subtitle">Preencha para adicionar ao histórico de pagamentos</p>
               </div>
             </div>
             <form id="form-rapido" autocomplete="off" class="sec-form">
@@ -512,7 +516,7 @@
               <div style="display:flex;flex-direction:column;gap:4px;width:100%">
                 <div style="display:flex;align-items:center;gap:10px">
                   <h3>Pacientes sem Retorno Agendado</h3>
-                  <span class="badge-pill" id="retorno-count-pill">0</span>
+                  <span class="badge-pill" id="retorno-count-pill" style="background:var(--amber)">0</span>
                   <button class="btn btn-sm btn-outline" id="btn-retorno-sort" style="margin-left:auto">Mais antigos primeiro ↑</button>
                 </div>
                 <p class="card-subtitle">Pacientes ativos com última consulta há mais de 30 dias e sem agendamento futuro</p>
@@ -943,6 +947,22 @@
           <button type="submit" class="btn btn-primary">Confirmar Emissão</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ══ MODAL: CONFIRMAÇÃO ════════════════════════════════════════════════ -->
+  <div class="modal-overlay hidden" id="modal-confirm">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h3 id="confirm-title">Confirmar ação</h3>
+      </div>
+      <div style="padding:20px 24px">
+        <p id="confirm-msg" style="color:var(--text-2);font-size:.92rem;line-height:1.5"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" id="confirm-cancel">Cancelar</button>
+        <button type="button" class="btn btn-danger"  id="confirm-ok">Confirmar</button>
+      </div>
     </div>
   </div>
 
