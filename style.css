@@ -258,6 +258,10 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .card { background: var(--white); border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
 .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .card-header h3 { font-size: 1rem; color: var(--text); }
+.chart-period-toggle { display: flex; gap: 2px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 2px; }
+.chart-period-btn { background: none; border: none; border-radius: 4px; padding: 3px 9px; font-size: .75rem; font-weight: 600; color: var(--text-muted); cursor: pointer; transition: all .15s; }
+.chart-period-btn.active { background: var(--white); color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.chart-period-btn:hover:not(.active) { color: var(--text); }
 .card-subtitle { font-size: .78rem; color: var(--text-muted); margin-top: 2px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 400; }
 
 /* ============================================================

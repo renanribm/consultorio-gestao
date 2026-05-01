@@ -37,6 +37,7 @@ const S = {
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
   recSort:         { col: 'date', dir: 'desc' },
+  chartMonths:     6,
   calendarYear:    new Date().getFullYear(),
   calendarMonth:   new Date().getMonth(),
   calendarSelDay:  null,
@@ -648,7 +649,8 @@ function renderDashboard() {
 }
 
 function renderMensalChart() {
-  const months = getMonthlyData(6);
+  const n      = S.chartMonths;
+  const months = getMonthlyData(n);
   const ctx    = el('chart-mensal').getContext('2d');
   if (S.charts.mensal) S.charts.mensal.destroy();
   S.charts.mensal = new Chart(ctx, {
@@ -670,7 +672,7 @@ function renderMensalChart() {
         tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}` } },
       },
       scales: {
-        x: { grid:{display:false}, ticks:{font:{family:'Plus Jakarta Sans',size:11}} },
+        x: { grid:{display:false}, ticks:{ font:{family:'Plus Jakarta Sans',size:11}, maxRotation: n > 6 ? 45 : 0, minRotation: n > 6 ? 45 : 0 } },
         y: { grid:{color:'#e8f3ee'}, ticks:{font:{family:'Plus Jakarta Sans',size:11}, callback:v=>fmtBRLShort(v)} },
       },
     },
@@ -2727,6 +2729,14 @@ document.addEventListener('click', (e) => {
 
   const alink = e.target.closest('.alert-link[data-view]');
   if (alink) { e.preventDefault(); navigateTo(alink.dataset.view); return; }
+
+  const periodBtn = e.target.closest('.chart-period-btn');
+  if (periodBtn) {
+    S.chartMonths = parseInt(periodBtn.dataset.months, 10);
+    document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.toggle('active', b === periodBtn));
+    renderMensalChart();
+    return;
+  }
 
   const btn = e.target.closest('[data-action]');
   if (!btn) return;

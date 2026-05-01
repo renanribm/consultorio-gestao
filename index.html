@@ -198,7 +198,15 @@
         </div>
         <div class="dashboard-grid">
           <div class="card chart-card">
-            <div class="card-header"><h3>Evolução Mensal (6 meses)</h3></div>
+            <div class="card-header">
+              <h3>Evolução Mensal</h3>
+              <div class="chart-period-toggle">
+                <button class="chart-period-btn" data-months="3">3m</button>
+                <button class="chart-period-btn active" data-months="6">6m</button>
+                <button class="chart-period-btn" data-months="12">12m</button>
+                <button class="chart-period-btn" data-months="24">24m</button>
+              </div>
+            </div>
             <div class="chart-wrap"><canvas id="chart-mensal"></canvas></div>
           </div>
           <div class="card">
