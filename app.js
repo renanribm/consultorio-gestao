@@ -307,6 +307,7 @@ function updateBadges() {
   const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayStr);
   setCount('badge-inadimplencia', pendRec.length);
   setCount('badge-nf', pendNF.length);
+  setCount('badge-retorno', calcRetornoPatients().filter(p => p.needsContact).length);
   setCount('badge-inativacao', calcInativacaoSugestoes().length);
 }
 
