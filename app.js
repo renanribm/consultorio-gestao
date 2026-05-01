@@ -102,9 +102,8 @@ el('login-form').addEventListener('submit', async (e) => {
 el('btn-logout').addEventListener('click', () => signOut(auth));
 
 function applyRoleUI() {
-  const isMedica = S.role === 'medica';
-  document.querySelectorAll('.nav-medica-only').forEach(e => e.classList.toggle('hidden', !isMedica));
-  el('sidebar-avatar').textContent    = isMedica ? 'M' : 'S';
+  document.querySelectorAll('.nav-medica-only').forEach(e => e.classList.remove('hidden'));
+  el('sidebar-avatar').textContent    = S.role === 'medica' ? 'M' : 'S';
   el('sidebar-user-name').textContent = S.user.email.split('@')[0];
   el('sidebar-user-role').textContent = labels.role[S.role];
   el('login-screen').classList.add('hidden');
@@ -151,9 +150,6 @@ el('sidebar-backdrop').addEventListener('click', closeMobileDrawer);
 el('btn-mobile-logout').addEventListener('click', () => signOut(auth));
 
 function navigateTo(view) {
-  if (S.role === 'secretaria' && (view === 'dre' || view === 'import')) {
-    showToast('Acesso restrito à médica.', 'error'); return;
-  }
   S.view = view;
   document.querySelectorAll('section.view').forEach(s => s.classList.add('hidden'));
   const target = el('view-' + view);
@@ -1038,7 +1034,7 @@ function renderPacientes() {
       <td>${patientStatusBadge(p.status)}</td>
       <td><div class="action-btns">
         <button class="btn-edit" data-id="${p.id}" data-action="edit-pac">Editar</button>
-        ${S.role==='medica'?`<button class="btn-del" data-id="${p.id}" data-action="del-pac">Excluir</button>`:''}
+        <button class="btn-del" data-id="${p.id}" data-action="del-pac">Excluir</button>
       </div></td>
     </tr>`).join('');
 }
@@ -1239,7 +1235,7 @@ function renderRecebimentos() {
       <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:.78rem">${esc(r.notes||'')}</td>
       <td><div class="action-btns">
         <button class="btn-edit" data-id="${r.id}" data-action="edit-rec">Editar</button>
-        ${S.role==='medica'?`<button class="btn-del" data-id="${r.id}" data-action="del-rec">Excluir</button>`:''}
+        <button class="btn-del" data-id="${r.id}" data-action="del-rec">Excluir</button>
       </div></td>
     </tr>`;
   }).join('');
@@ -1375,7 +1371,7 @@ function renderDespesas() {
     <td class="text-right value-cell" style="color:var(--red)">${fmtBRL(d.value||0)}${d.taxRate ? `<span style="font-size:.75rem;color:var(--text-muted);margin-left:4px">(${d.taxRate}%)</span>` : ''}</td>
     <td><div class="action-btns">
       <button class="btn-edit" data-id="${d.id}" data-action="edit-desp">Editar</button>
-      ${S.role==='medica'?`<button class="btn-del" data-id="${d.id}" data-action="del-desp">Excluir</button>`:''}
+      <button class="btn-del" data-id="${d.id}" data-action="del-desp">Excluir</button>
     </div></td>
   </tr>`).join('');
 }
