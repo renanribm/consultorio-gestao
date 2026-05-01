@@ -2135,10 +2135,29 @@ function openModalNota(nota = null) {
 // ─────────────────────────────────────────────────────────────────────────────
 // DRE
 // ─────────────────────────────────────────────────────────────────────────────
+function drePeriodLabel() {
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesesAbr = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const { preset, start, end } = S.filter;
+  if (!start) return 'Demonstrativo de Resultado';
+  const [sy, sm] = start.split('-').map(Number);
+  const [ey, em] = end.split('-').map(Number);
+  if (preset === 'mes' || preset === 'mespassado' || preset === 'proximomes') {
+    return `${meses[sm-1]} ${sy}`;
+  }
+  if (preset === 'ano') return String(sy);
+  if (preset === '3meses' || preset === '6meses') {
+    return sy === ey
+      ? `${mesesAbr[sm-1]} → ${mesesAbr[em-1]} ${ey}`
+      : `${mesesAbr[sm-1]} ${sy} → ${mesesAbr[em-1]} ${ey}`;
+  }
+  return `${fmtDate(start)} → ${fmtDate(end)}`;
+}
+
 function renderDRE() {
   const recs  = filteredRec();
   const desps = filteredDesp();
-  if (S.filter.start) setText('dre-period', `${fmtDate(S.filter.start)} → ${fmtDate(S.filter.end)}`);
+  setText('dre-title', `DRE — ${drePeriodLabel()}`);
 
   const recByType = { presencial:0, teleconsulta:0 };
   recs.filter(r=>r.status!=='gratuito').forEach(r => {
