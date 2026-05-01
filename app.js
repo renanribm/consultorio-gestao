@@ -37,6 +37,7 @@ const S = {
   importing:       false,
   nfSelected:      new Set(),
   nfTab:           'pendentes',
+  modalDirty:      false,
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
   pacStatusFilter: 'todos',
@@ -2930,15 +2931,28 @@ function setupAutocomplete(inputId, listId, hiddenId) {
 // ─────────────────────────────────────────────────────────────────────────────
 // MODAL MANAGEMENT
 // ─────────────────────────────────────────────────────────────────────────────
-function openModal(id)  { el(id).classList.remove('hidden'); }
-function closeModal(id) { el(id).classList.add('hidden'); }
+const FORM_MODALS = new Set(['modal-rec','modal-desp','modal-pac','modal-nota']);
+
+function openModal(id)  { S.modalDirty = false; el(id).classList.remove('hidden'); }
+function closeModal(id) { el(id).classList.add('hidden'); S.modalDirty = false; }
+
+function tryCloseModal(id) {
+  if (FORM_MODALS.has(id) && S.modalDirty) {
+    showConfirm('Há alterações não salvas. Deseja descartar?', () => closeModal(id), { title: 'Descartar alterações', okLabel: 'Descartar', danger: true });
+  } else {
+    closeModal(id);
+  }
+}
 
 document.querySelectorAll('[data-close]').forEach(btn => {
-  btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  btn.addEventListener('click', () => tryCloseModal(btn.dataset.close));
 });
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', (e) => { if(e.target===overlay) closeModal(overlay.id); });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) tryCloseModal(overlay.id); });
 });
+
+document.addEventListener('input',  e => { if (e.target.closest('.modal-overlay:not(.hidden)')) S.modalDirty = true; });
+document.addEventListener('change', e => { if (e.target.closest('.modal-overlay:not(.hidden)')) S.modalDirty = true; });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DELEGATED EVENTS
