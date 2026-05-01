@@ -1055,9 +1055,17 @@ document.querySelector('#view-pacientes thead').addEventListener('click', (e) =>
 function renderPacientes() {
   renderDuplicatesSection();
 
-  const q = el('search-pac').value.toLowerCase();
+  const rawQ   = el('search-pac').value;
+  const q      = rawQ.toLowerCase();
+  const qDigits = rawQ.replace(/\D/g, '');
   let rows = S.data.patients
-    .filter(p => !q || (p.name||'').toLowerCase().includes(q))
+    .filter(p => {
+      if (!rawQ) return true;
+      if ((p.name||'').toLowerCase().includes(q)) return true;
+      if (qDigits && (p.phone||'').replace(/\D/g,'').includes(qDigits)) return true;
+      if (qDigits && (p.phone2||'').replace(/\D/g,'').includes(qDigits)) return true;
+      return false;
+    })
     .filter(p => S.pacStatusFilter === 'todos' || (p.status || 'ativo') === S.pacStatusFilter)
     .map(p => ({ p, stats: getPatientStats(p.id, p.name) }));
 
