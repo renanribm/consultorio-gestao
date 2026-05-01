@@ -1144,7 +1144,7 @@ function renderPacienteDetalhe(patientId) {
     ['E-mail', pac.email || '—'],
     ['Data de Nascimento', pac.birthDate ? `${fmtDate(pac.birthDate)}${age !== null ? ' (' + age + ' anos)' : ''}` : '—'],
     pac.gender    ? ['Sexo', genderMap[pac.gender] || pac.gender]                      : null,
-    pac.cpf       ? ['CPF', pac.cpf]                                                   : null,
+    pac.cpf       ? ['CPF', fmtCPF(pac.cpf)]                                          : null,
     pac.indication? ['Como chegou', pac.indication]                                    : null,
   ].filter(Boolean);
 
@@ -2881,6 +2881,7 @@ function today()            { return new Date().toISOString().split('T')[0]; }
 function fmtBRL(v)          { return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0); }
 function fmtBRLShort(v)     { return v>=1000?'R$'+(v/1000).toFixed(0)+'k':fmtBRL(v); }
 function fmtDate(d)         { if(!d)return'—'; const[y,m,dy]=d.split('-'); return`${dy}/${m}/${y}`; }
+function fmtCPF(v)          { const d=(v||'').replace(/\D/g,''); return d.length===11?`${d.slice(0,3)}.${d.slice(3,6)}.${d.slice(6,9)}-${d.slice(9)}`:v; }
 function fmtTimestamp(ts)   { try{return ts.toDate().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return''} }
 function daysBetween(d1,d2) { return Math.max(0,Math.round((new Date(d2)-new Date(d1))/86400000)); }
 function dateAddDays(dateStr,n) { const d=new Date(dateStr); d.setDate(d.getDate()+n); return d.toISOString().split('T')[0]; }
