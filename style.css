@@ -502,7 +502,7 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .modal-close-btn { color: var(--text-muted); font-size: 1rem; padding: 4px 8px; border-radius: var(--radius-sm); transition: all var(--transition); flex-shrink: 0; }
 .modal-close-btn:hover { background: var(--bg); color: var(--text); }
 .modal form { padding: 22px 26px; display: flex; flex-direction: column; gap: 18px; }
-.modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding-top: 8px; border-top: 1px solid var(--border-light); margin-top: 4px; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding: 16px 24px; border-top: 1px solid var(--border-light); margin-top: 4px; }
 
 /* ============================================================
    TOAST
