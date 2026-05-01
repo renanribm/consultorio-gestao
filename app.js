@@ -1673,14 +1673,11 @@ function renderRetornoAlert() {
 
   const todos      = calcRetornoPatients();
   const urgentes   = todos
-    .filter(p => p.needsContact && (p.attempts > 0 || p.days >= 37))
+    .filter(p => p.needsContact)
     .sort((a, b) => (b.attempts - a.attempts) || a.lastDate.localeCompare(b.lastDate));
   const aguardando = todos
     .filter(p => !p.needsContact)
     .sort((a, b) => (a.nextContact || '').localeCompare(b.nextContact || ''));
-  const novos      = todos
-    .filter(p => p.needsContact && p.attempts === 0 && p.days < 37 && p.days >= 20)
-    .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
 
   const pill = el('retorno-count-pill');
   if (pill) pill.textContent = todos.length;
@@ -1772,11 +1769,6 @@ function renderRetornoAlert() {
   if (aguardando.length) {
     html += `<div class="retorno-section-hdr retorno-section-waiting">⏳ Aguardando resposta (${aguardando.length})</div>`;
     html += aguardando.map(p => retornoItemHTML(p, 'waiting')).join('');
-  }
-  if (novos.length) {
-    if (urgentes.length || aguardando.length)
-      html += `<div class="retorno-section-hdr">🕐 Prazo de retorno natural (${novos.length})</div>`;
-    html += novos.map(p => retornoItemHTML(p, 'new')).join('');
   }
   container.innerHTML = html;
 }
