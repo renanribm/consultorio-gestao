@@ -7,7 +7,7 @@ import { initializeApp }                                      from 'https://www.
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, collection, addDoc, getDocs, getDoc, updateDoc, deleteDoc,
-         doc, query, orderBy, serverTimestamp, writeBatch, setDoc, deleteField }
+         doc, query, orderBy, serverTimestamp, writeBatch, setDoc, deleteField, onSnapshot }
                                                               from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,6 +33,8 @@ const S = {
   editingPaciente: null,
   currentPatient:  null,
   importFiles:     { patient: null, event: null },
+  listeners:       {},
+  importing:       false,
   nfSelected:      new Set(),
   inadimSelected:  new Set(),
   pacSort:         { col: 'name', dir: 'asc' },
@@ -74,6 +76,7 @@ onAuthStateChanged(auth, async (user) => {
     navigateTo('dashboard');
     el('loading-overlay').classList.add('hidden');
   } else {
+    unsubscribeAll();
     S.user = null; S.role = null;
     el('app-shell').classList.add('hidden');
     el('login-screen').classList.remove('hidden');
@@ -254,21 +257,32 @@ function filterByPeriod(arr) {
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA — Firestore CRUD
 // ─────────────────────────────────────────────────────────────────────────────
-async function loadAll() {
+function subscribeCollection(name, constraints) {
+  if (S.listeners[name]) { S.listeners[name](); delete S.listeners[name]; }
+  const q = query(collection(db, name), ...constraints);
+  return new Promise((resolve, reject) => {
+    let initial = true;
+    S.listeners[name] = onSnapshot(q, snap => {
+      S.data[name] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      if (initial) { initial = false; resolve(); return; }
+      if (!S.importing) {
+        updateBadges();
+        renderView(S.view);
+      }
+    }, err => { if (initial) { initial = false; reject(err); } });
+  });
+}
+
+async function subscribeAll() {
   showLoading();
   try {
-    const [recs, desps, notas, patients, consults] = await Promise.all([
-      fetchCollection('recebimentos',  [orderBy('date', 'desc')]),
-      fetchCollection('despesas',      [orderBy('date', 'desc')]),
-      fetchCollection('notas',         [orderBy('createdAt', 'desc')]),
-      fetchCollection('patients',      [orderBy('name', 'asc')]),
-      fetchCollection('consultations', [orderBy('date', 'desc')]),
+    await Promise.all([
+      subscribeCollection('recebimentos',  [orderBy('date', 'desc')]),
+      subscribeCollection('despesas',      [orderBy('date', 'desc')]),
+      subscribeCollection('notas',         [orderBy('createdAt', 'desc')]),
+      subscribeCollection('patients',      [orderBy('name', 'asc')]),
+      subscribeCollection('consultations', [orderBy('date', 'desc')]),
     ]);
-    S.data.recebimentos  = recs;
-    S.data.despesas      = desps;
-    S.data.notas         = notas;
-    S.data.patients      = patients;
-    S.data.consultations = consults;
     updateBadges();
   } catch (err) {
     console.error(err);
@@ -277,6 +291,13 @@ async function loadAll() {
     hideLoading();
   }
 }
+
+function unsubscribeAll() {
+  Object.values(S.listeners).forEach(unsub => unsub());
+  S.listeners = {};
+}
+
+async function loadAll() { await subscribeAll(); }
 
 async function fetchCollection(name, constraints = []) {
   const q    = query(collection(db, name), ...constraints);
@@ -2149,6 +2170,7 @@ async function runImport() {
   const { patient: patFile, event: evtFile } = S.importFiles;
   if (!patFile && !evtFile) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
 
+  S.importing = true;
   el('import-actions-bar').classList.add('hidden');
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
@@ -2389,6 +2411,10 @@ async function runImport() {
     setProgress(0, '');
     el('import-progress').classList.add('hidden');
     el('import-actions-bar').classList.remove('hidden');
+  } finally {
+    S.importing = false;
+    updateBadges();
+    renderView(S.view);
   }
 }
 
