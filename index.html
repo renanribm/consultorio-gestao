@@ -511,35 +511,23 @@
           </div>
 
           <!-- Alerta de Retorno -->
-          <div class="card sec-card">
+          <div class="card sec-card sec-card-tall">
             <div class="card-header">
               <div style="display:flex;flex-direction:column;gap:4px;width:100%">
                 <div style="display:flex;align-items:center;gap:10px">
                   <h3>Pacientes sem Retorno Agendado</h3>
                   <span class="badge-pill" id="retorno-count-pill" style="background:var(--amber)">0</span>
-                  <button class="btn btn-sm btn-outline" id="btn-retorno-sort" style="margin-left:auto">Mais antigos primeiro ↑</button>
                 </div>
-                <p class="card-subtitle">Pacientes ativos com última consulta há mais de 30 dias e sem agendamento futuro</p>
+                <p class="card-subtitle">Gestão de follow-up para remarcação de consultas</p>
               </div>
             </div>
-            <div class="nf-list" id="retorno-list">
+            <div class="nf-list sec-scrollable" id="retorno-list">
               <div class="empty-state">Nenhum paciente sem retorno agendado.</div>
             </div>
           </div>
 
-          <!-- Anotações Internas -->
-          <div class="card sec-card sec-card-tall">
-            <div class="card-header">
-              <h3>Anotações Internas</h3>
-              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
-            </div>
-            <div class="notas-list" id="notas-list">
-              <div class="empty-state">Nenhuma anotação.</div>
-            </div>
-          </div>
-
           <!-- Revisão de Longa Ausência -->
-          <div class="card sec-card">
+          <div class="card sec-card sec-card-tall">
             <div class="card-header">
               <div style="display:flex;flex-direction:column;gap:4px;width:100%">
                 <div style="display:flex;align-items:center;gap:10px">
@@ -550,8 +538,19 @@
                 <p class="card-subtitle">Pacientes ativos sem consulta há mais de 180 dias — marque como Alta, Inativo ou mantenha ativo por mais 180 dias</p>
               </div>
             </div>
-            <div class="nf-list" id="inativacao-list">
+            <div class="nf-list sec-scrollable" id="inativacao-list">
               <div class="empty-state">Nenhuma sugestão de inativação.</div>
+            </div>
+          </div>
+
+          <!-- Anotações Internas -->
+          <div class="card sec-card sec-card-wide sec-card-bottom">
+            <div class="card-header">
+              <h3>Anotações Internas</h3>
+              <button class="btn btn-sm btn-outline" id="btn-nova-nota">+ Nova Anotação</button>
+            </div>
+            <div class="notas-list notas-list-bottom" id="notas-list">
+              <div class="empty-state">Nenhuma anotação.</div>
             </div>
           </div>
 

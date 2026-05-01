@@ -1486,12 +1486,6 @@ el('form-rapido').addEventListener('submit', async (e) => {
 
 el('btn-nova-nota').addEventListener('click', () => openModalNota());
 
-el('btn-retorno-sort').addEventListener('click', () => {
-  S.retornoSort = S.retornoSort === 'asc' ? 'desc' : 'asc';
-  el('btn-retorno-sort').textContent = S.retornoSort === 'asc' ? 'Mais antigos primeiro ↑' : 'Mais recentes primeiro ↓';
-  renderRetornoAlert();
-});
-
 // auto-fill next contact date based on situation selection
 document.addEventListener('change', e => {
   const sel = e.target.closest('.retorno-situacao-sel');
@@ -1686,9 +1680,7 @@ function renderRetornoAlert() {
     .sort((a, b) => (a.nextContact || '').localeCompare(b.nextContact || ''));
   const novos      = todos
     .filter(p => p.needsContact && p.attempts === 0 && p.days < 37)
-    .sort((a, b) => S.retornoSort === 'asc'
-      ? a.lastDate.localeCompare(b.lastDate)
-      : b.lastDate.localeCompare(a.lastDate));
+    .sort((a, b) => a.lastDate.localeCompare(b.lastDate));
 
   const pill = el('retorno-count-pill');
   if (pill) pill.textContent = todos.length;
@@ -1896,7 +1888,7 @@ function renderNFPendentes() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <div class="nf-item-value">${fmtBRL(r.value||0)}</div>
-        <button class="btn btn-sm btn-primary" data-id="${r.id}" data-action="mark-nf">Emitida</button>
+        <button class="btn btn-sm btn-primary" data-id="${r.id}" data-action="mark-nf">✓ Marcar emitida</button>
       </div>
     </div>`;
   }).join('');

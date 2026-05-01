@@ -402,9 +402,11 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .sec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 .sec-card { padding: 0; }
 .sec-card .card-header { padding: 18px 22px 16px; }
-.sec-card-wide { grid-column: 1 / -1; max-width: 860px; }
+.sec-card-wide { grid-column: 1 / -1; }
 .sec-card-tall { grid-row: span 2; display: flex; flex-direction: column; }
-.sec-card-tall .notas-list { flex: 1; overflow-y: auto; min-height: 0; max-height: none; }
+.sec-card-tall .sec-scrollable { flex: 1; overflow-y: auto; min-height: 0; }
+.sec-card-bottom { max-width: none; }
+.notas-list-bottom { max-height: 180px; overflow-y: auto; }
 
 .sec-form { padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
 .form-action-wrap { margin-top: 8px; }
@@ -712,7 +714,7 @@ input[type="checkbox"].row-check {
   .dre-layout { grid-template-columns: 1fr; }
   .sec-grid { grid-template-columns: 1fr; }
   .sec-card-wide { grid-column: auto; }
-  .sec-card-tall { grid-row: auto; order: 10; }
+  .sec-card-tall { grid-row: auto; }
   .patient-info-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 680px) {
