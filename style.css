@@ -694,7 +694,7 @@ input[type="checkbox"].row-check {
   .dre-layout { grid-template-columns: 1fr; }
   .sec-grid { grid-template-columns: 1fr; }
   .sec-card-wide { grid-column: auto; }
-  .sec-card-tall { grid-row: auto; }
+  .sec-card-tall { grid-row: auto; order: 10; }
   .patient-info-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 680px) {
