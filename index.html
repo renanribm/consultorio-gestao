@@ -447,9 +447,19 @@
           <!-- NFs Pendentes -->
           <div class="card sec-card">
             <div class="card-header">
-              <div style="display:flex;align-items:center;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
                 <h3>Notas Fiscais Pendentes</h3>
                 <span class="badge-pill" id="nf-count-pill" style="background:var(--red)">0</span>
+                <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
+                  <a href="https://www.nfse.gov.br/EmissorNacional/Login" target="_blank" rel="noopener" class="nf-link-btn">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                    NFS-e Nacional
+                  </a>
+                  <a href="https://nfe.prefeitura.sp.gov.br/login.aspx" target="_blank" rel="noopener" class="nf-link-btn">
+                    <svg viewBox="0 0 20 20" fill="currentColor" width="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
+                    NFS-e São Paulo
+                  </a>
+                </div>
               </div>
             </div>
             <div class="bulk-toolbar hidden" id="nf-bulk-toolbar">
@@ -459,16 +469,6 @@
               </label>
               <span class="bulk-count" id="nf-sel-count"></span>
               <button class="btn btn-sm btn-primary" id="btn-nf-bulk-emit" style="margin-left:auto" disabled>Marcar emitidas</button>
-            </div>
-            <div class="nf-actions">
-              <a href="https://www.nfse.gov.br/EmissorNacional/Login" target="_blank" rel="noopener" class="nf-link-btn">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
-                NFS-e Nacional
-              </a>
-              <a href="https://nfe.prefeitura.sp.gov.br/login.aspx" target="_blank" rel="noopener" class="nf-link-btn">
-                <svg viewBox="0 0 20 20" fill="currentColor" width="14"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/></svg>
-                NFS-e São Paulo
-              </a>
             </div>
             <div class="nf-list" id="nf-list">
               <div class="empty-state">Nenhuma NF pendente de emissão.</div>
