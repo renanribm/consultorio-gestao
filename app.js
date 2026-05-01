@@ -665,7 +665,10 @@ function renderMensalChart() {
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { family:'Plus Jakarta Sans', size:11 }, boxWidth:12 } } },
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { family:'Plus Jakarta Sans', size:11 }, boxWidth:12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtBRL(ctx.parsed.y)}` } },
+      },
       scales: {
         x: { grid:{display:false}, ticks:{font:{family:'Plus Jakarta Sans',size:11}} },
         y: { grid:{color:'#e8f3ee'}, ticks:{font:{family:'Plus Jakarta Sans',size:11}, callback:v=>fmtBRLShort(v)} },
