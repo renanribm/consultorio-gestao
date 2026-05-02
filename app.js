@@ -2228,7 +2228,7 @@ function renderDRECharts(recByType, despByCat, catOrder) {
   S.charts.recTipo = new Chart(ctxRT, {
     type: 'doughnut',
     data: { labels:['Presencial','Teleconsulta'], datasets:[{data:[recByType.presencial,recByType.teleconsulta],backgroundColor:['#2d7a5f','#71c9a7'],borderWidth:2,borderColor:'#fff'}] },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}}} },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}},tooltip:{callbacks:{label:ctx=>' '+fmtBRL(ctx.parsed)}}} },
   });
 
   const ctxDC = el('chart-desp-cat').getContext('2d');
