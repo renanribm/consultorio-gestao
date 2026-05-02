@@ -42,6 +42,7 @@ const S = {
   pacSort:         { col: 'name', dir: 'asc' },
   pacStatusFilter: 'todos',
   recSort:         { col: 'date', dir: 'desc' },
+  despSort:        { col: 'date', dir: 'desc' },
   retornoSort:     'urgencia',
   chartMonths:     6,
   calendarYear:    new Date().getFullYear(),
@@ -1456,10 +1457,10 @@ el('form-desp').addEventListener('submit', async (e) => {
   const isMensal = data.recurrence === 'mensal';
 
   if (isNew && isMensal) {
-    closeModal('modal-desp');
     showConfirm(
       `Isso vai criar 12 lançamentos mensais a partir de ${fmtDate(data.date)} com o valor ${fmtBRL(data.value)} cada. Confirmar?`,
       async () => {
+        closeModal('modal-desp');
         showLoading();
         try {
           const batch = writeBatch(db);
@@ -1472,6 +1473,7 @@ el('form-desp').addEventListener('submit', async (e) => {
             });
           }
           await batch.commit();
+          await reloadCollection('despesas');
           showToast('12 lançamentos mensais criados!', 'success');
           renderDespesas();
         } catch (err) { handleErr(err); } finally { hideLoading(); }
@@ -1488,10 +1490,38 @@ el('form-desp').addEventListener('submit', async (e) => {
 
 el('search-desp').addEventListener('input', renderDespesas);
 
+el('thead-desp').addEventListener('click', (e) => {
+  const th = e.target.closest('th[data-sort]');
+  if (!th) return;
+  const col = th.dataset.sort;
+  if (S.despSort.col === col) S.despSort.dir = S.despSort.dir === 'asc' ? 'desc' : 'asc';
+  else { S.despSort.col = col; S.despSort.dir = 'asc'; }
+  renderDespesas();
+});
+
 function renderDespesas() {
   let desps = filteredDesp();
   const q   = el('search-desp').value.toLowerCase();
   if (q) desps = desps.filter(d => (d.description||'').toLowerCase().includes(q));
+
+  const { col, dir } = S.despSort;
+  const mult = dir === 'asc' ? 1 : -1;
+  desps.sort((a, b) => {
+    switch (col) {
+      case 'date':        return mult * (a.date||'').localeCompare(b.date||'');
+      case 'description': return mult * (a.description||'').localeCompare(b.description||'', 'pt-BR', { sensitivity: 'base' });
+      case 'category':    return mult * (a.category||'').localeCompare(b.category||'');
+      case 'recurrence':  return mult * (a.recurrence||'').localeCompare(b.recurrence||'');
+      case 'value':       return mult * ((a.value||0) - (b.value||0));
+      default:            return 0;
+    }
+  });
+
+  document.querySelectorAll('#thead-desp th[data-sort]').forEach(th => {
+    if (th.dataset.sort === col) th.setAttribute('data-dir', dir);
+    else th.removeAttribute('data-dir');
+  });
+
   const total = desps.reduce((s,d)=>s+(d.value||0),0);
   el('summary-desp').innerHTML = `${desps.length} reg. &nbsp;|&nbsp; Total: <strong>${fmtBRL(total)}</strong>`;
 
