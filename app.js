@@ -287,6 +287,16 @@ function filterByPeriod(arr) {
   return arr.filter(r => r.date >= S.filter.start && r.date <= S.filter.end);
 }
 
+// Faturamento bruto de um mês específico, independente do filtro global
+function revenueForMonth(year, month) {
+  const pad = n => String(n).padStart(2, '0');
+  const start = `${year}-${pad(month)}-01`;
+  const end   = `${year}-${pad(month)}-31`;
+  return S.data.recebimentos
+    .filter(r => r.date >= start && r.date <= end && r.status !== 'gratuito')
+    .reduce((s, r) => s + (r.value || 0), 0);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA — Firestore CRUD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1413,6 +1423,7 @@ el('btn-nova-desp').addEventListener('click', () => openModalDesp());
 
 el('desp-cat').addEventListener('change', updateDespModalMode);
 el('desp-pct').addEventListener('input', updateDespPctPreview);
+el('desp-data').addEventListener('change', updateDespPctPreview);
 
 function updateDespModalMode() {
   const isImposto = el('desp-cat').value === 'impostos';
@@ -1424,9 +1435,16 @@ function updateDespModalMode() {
 }
 
 function updateDespPctPreview() {
-  const pct          = parseFloat(el('desp-pct').value) || 0;
-  const grossRevenue = filteredRec().filter(r => r.status !== 'gratuito').reduce((s, r) => s + (r.value || 0), 0);
-  const calculated   = (pct / 100) * grossRevenue;
+  const pct      = parseFloat(el('desp-pct').value) || 0;
+  const dateVal  = el('desp-data').value;
+  let grossRevenue;
+  if (dateVal) {
+    const [y, m] = dateVal.split('-').map(Number);
+    grossRevenue = revenueForMonth(y, m);
+  } else {
+    grossRevenue = filteredRec().filter(r => r.status !== 'gratuito').reduce((s, r) => s + (r.value || 0), 0);
+  }
+  const calculated = (pct / 100) * grossRevenue;
   el('desp-pct-preview').textContent = pct > 0
     ? `Sobre ${fmtBRL(grossRevenue)} de faturamento bruto = ${fmtBRL(calculated)}`
     : '';
@@ -1435,26 +1453,71 @@ function updateDespPctPreview() {
 el('form-desp').addEventListener('submit', async (e) => {
   e.preventDefault();
   const isImposto = el('desp-cat').value === 'impostos';
-  let value, taxRate;
-  if (isImposto) {
-    taxRate            = parseFloat(el('desp-pct').value) || 0;
-    const grossRevenue = filteredRec().filter(r => r.status !== 'gratuito').reduce((s, r) => s + (r.value || 0), 0);
-    value              = (taxRate / 100) * grossRevenue;
-  } else {
-    value   = parseFloat(el('desp-valor').value) || 0;
-    taxRate = null;
+  const isNew     = !S.editingDesp;
+  const isMensal  = el('desp-rec').value === 'mensal';
+  let taxRate = null;
+
+  const baseDate = el('desp-data').value;
+  const [baseY, baseM] = baseDate.split('-').map(Number);
+
+  // Para imposto com recorrência mensal, cada mês tem seu próprio valor calculado
+  if (isImposto && isNew && isMensal) {
+    taxRate = parseFloat(el('desp-pct').value) || 0;
+    const baseData = {
+      date:        baseDate,
+      description: el('desp-desc').value.trim(),
+      category:    el('desp-cat').value,
+      recurrence:  el('desp-rec').value,
+      taxRate,
+    };
+    const monthPreviews = Array.from({ length: 12 }, (_, i) => {
+      const dt  = new Date(baseY, baseM - 1 + i, 1);
+      const rev = revenueForMonth(dt.getFullYear(), dt.getMonth() + 1);
+      return { dt, rev, value: (taxRate / 100) * rev };
+    });
+    const totalVal = monthPreviews.reduce((s, mp) => s + mp.value, 0);
+    showConfirm(
+      `Isso vai criar 12 lançamentos mensais de imposto (${taxRate}%), calculados sobre o faturamento de cada mês individualmente. Total estimado: ${fmtBRL(totalVal)}. Confirmar?`,
+      async () => {
+        closeModal('modal-desp');
+        showLoading();
+        try {
+          const batch = writeBatch(db);
+          for (const { dt, value } of monthPreviews) {
+            const pad = n => String(n).padStart(2, '0');
+            const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(baseDate.split('-')[2])}`;
+            batch.set(doc(collection(db, 'despesas')), {
+              ...baseData, date: dateStr, value, createdAt: serverTimestamp(), createdBy: S.user.uid,
+            });
+          }
+          await batch.commit();
+          await reloadCollection('despesas');
+          showToast('12 lançamentos de imposto criados!', 'success');
+          renderDespesas();
+        } catch (err) { handleErr(err); } finally { hideLoading(); }
+      },
+      { title: 'Criar despesa recorrente', okLabel: 'Criar 12 lançamentos' }
+    );
+    return;
   }
+
+  let value;
+  if (isImposto) {
+    taxRate = parseFloat(el('desp-pct').value) || 0;
+    const grossRevenue = revenueForMonth(baseY, baseM);
+    value = (taxRate / 100) * grossRevenue;
+  } else {
+    value = parseFloat(el('desp-valor').value) || 0;
+  }
+
   const data = {
-    date:        el('desp-data').value,
+    date:        baseDate,
     description: el('desp-desc').value.trim(),
     category:    el('desp-cat').value,
     recurrence:  el('desp-rec').value,
     value,
     taxRate:     taxRate ?? null,
   };
-
-  const isNew    = !S.editingDesp;
-  const isMensal = data.recurrence === 'mensal';
 
   if (isNew && isMensal) {
     showConfirm(
@@ -1465,9 +1528,9 @@ el('form-desp').addEventListener('submit', async (e) => {
         try {
           const batch = writeBatch(db);
           for (let i = 0; i < 12; i++) {
-            const [y, m, d] = data.date.split('-').map(Number);
-            const dt = new Date(y, m - 1 + i, d);
-            const dateStr = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+            const dt = new Date(baseY, baseM - 1 + i, Number(baseDate.split('-')[2]));
+            const pad = n => String(n).padStart(2, '0');
+            const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`;
             batch.set(doc(collection(db, 'despesas')), {
               ...data, date: dateStr, createdAt: serverTimestamp(), createdBy: S.user.uid,
             });
