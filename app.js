@@ -2295,7 +2295,7 @@ function renderNFPendentes() {
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
         <div class="nf-item-value">${fmtBRL(r.value||0)}</div>
-        <button class="btn btn-sm btn-primary" data-id="${r.id}" data-action="mark-nf">✓ Marcar emitida</button>
+        <button class="btn btn-sm btn-primary" data-id="${r.id}" data-action="mark-nf" style="font-size:.75rem;padding:4px 10px">✓ Marcar emitida</button>
       </div>
     </div>`;
   }).join('');
