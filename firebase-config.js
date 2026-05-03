@@ -42,6 +42,7 @@ export const labels = {
     secretaria:"Secretária",
     contador:  "Contador",
     material:  "Material",
+    consumo:   "Contas de consumo",
     impostos:  "Impostos",
     outros:    "Outros"
   },

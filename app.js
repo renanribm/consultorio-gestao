@@ -2272,7 +2272,7 @@ function renderDRE() {
   const recPendente  = recs.filter(r=>r.status==='pendente').reduce((s,r)=>s+(r.value||0),0);
   const countGrat    = recs.filter(r=>r.status==='gratuito').length;
 
-  const catOrder  = ['aluguel','iclinic','secretaria','contador','material','impostos','outros'];
+  const catOrder  = ['aluguel','iclinic','secretaria','contador','material','consumo','impostos','outros'];
   const despByCat = Object.fromEntries(catOrder.map(c=>[c,0]));
   desps.forEach(d => { despByCat[d.category] = (despByCat[d.category]||0)+resolvedValue(d); });
   const totalDesp = Object.values(despByCat).reduce((s,v)=>s+v,0);
@@ -2336,7 +2336,7 @@ function renderDRECharts(recByType, despByCat, catOrder) {
   if (S.charts.despCat) S.charts.despCat.destroy();
   S.charts.despCat = new Chart(ctxDC, {
     type: 'doughnut',
-    data: { labels:catOrder.map(c=>labels.expenseCategory[c]), datasets:[{data:catOrder.map(c=>despByCat[c]||0),backgroundColor:['#e07b54','#5ba88a','#7b6ec0','#c0aa3d','#3d88c0','#c03d5a','#9a9a9a'],borderWidth:2,borderColor:'#fff'}] },
+    data: { labels:catOrder.map(c=>labels.expenseCategory[c]), datasets:[{data:catOrder.map(c=>despByCat[c]||0),backgroundColor:['#e07b54','#5ba88a','#7b6ec0','#c0aa3d','#3d88c0','#4db8b8','#c03d5a','#9a9a9a'],borderWidth:2,borderColor:'#fff'}] },
     options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}}} },
   });
 }
