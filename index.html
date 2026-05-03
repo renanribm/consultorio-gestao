@@ -67,11 +67,6 @@
             <span class="nav-badge hidden" id="badge-inativacao" style="background:#6b7280">0</span>
           </span>
         </a>
-        <a class="nav-item" data-view="inadimplencia" href="#">
-          <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-          <span class="nav-label">Inadimplência</span>
-          <span class="nav-badge hidden" id="badge-inadimplencia" style="margin-left:auto">0</span>
-        </a>
         <a class="nav-item" data-view="pacientes" href="#">
           <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
           <span class="nav-label">Pacientes</span>
@@ -466,14 +461,16 @@
             <div class="aniversario-mes-list" id="aniversario-mes-list"></div>
           </div>
 
-          <!-- Alertas de Inadimplência -->
-          <div class="card sec-card sec-card-wide hidden" id="card-inadim-alerta">
+          <!-- Pacientes Inadimplentes -->
+          <div class="card sec-card sec-card-wide" id="card-inadim-alerta">
             <div class="card-header">
-              <h3>⚠️ Pacientes inadimplentes</h3>
+              <div style="display:flex;align-items:center;gap:10px">
+                <h3>⚠️ Pacientes inadimplentes</h3>
+                <span class="badge-pill" id="badge-inadim-card" style="background:var(--red)">0</span>
+              </div>
             </div>
-            <div class="inadim-alerta-body">
-              <div id="inadim-alerta-list"></div>
-              <a class="alert-link btn btn-sm btn-outline" data-view="inadimplencia" style="cursor:pointer;align-self:flex-start">Ver painel de inadimplência →</a>
+            <div class="inadim-card-list" id="inadim-alerta-list">
+              <div class="empty-state">Sem inadimplências registradas. 🎉</div>
             </div>
           </div>
 

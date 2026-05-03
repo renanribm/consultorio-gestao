@@ -187,7 +187,7 @@ function viewFromURL() {
     const patientId = path.slice('pacientes/'.length);
     if (patientId) return { view: 'paciente-detalhe', patientId };
   }
-  const valid = ['dashboard','secretaria','inadimplencia','pacientes','agenda','recebimentos','despesas','dre','import'];
+  const valid = ['dashboard','secretaria','pacientes','agenda','recebimentos','despesas','dre','import'];
   if (valid.includes(path)) return { view: path };
   return null;
 }
@@ -375,7 +375,7 @@ function updateBadges() {
   const todayStr = today();
   const pendRec = S.data.recebimentos.filter(r => r.status === 'pendente' && r.date <= todayStr);
   const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayStr);
-  setCount('badge-inadimplencia', pendRec.length);
+  setCount('badge-inadim-card', pendRec.length);
   setCount('badge-nf', pendNF.length);
   setCount('badge-retorno', calcRetornoPatients().filter(p => p.needsContact).length);
   setCount('badge-inativacao', calcInativacaoSugestoes().length);
@@ -1884,34 +1884,52 @@ function renderSecretaria() {
 }
 
 function renderInadimAlerta() {
-  const card = el('card-inadim-alerta');
-  if (!card) return;
+  const list = el('inadim-alerta-list');
+  if (!list) return;
   const todayStr = today();
-  const pendentes = S.data.recebimentos.filter(r => r.status === 'pendente' && r.date <= todayStr);
-  const overduePromises = pendentes.filter(r => r.contactStatus === 'promised' && r.promisedDate && r.promisedDate < todayStr);
-  const noResponse = pendentes.filter(r => r.contactStatus === 'no-response');
-  if (!overduePromises.length && !noResponse.length) { card.classList.add('hidden'); return; }
-  card.classList.remove('hidden');
-  const patientList = recs => `<div class="inadim-alerta-patient-list">${recs.map(r =>
-    `<div class="inadim-alerta-patient">
-      <span class="inadim-alerta-patient-name">${esc(r.patient||'—')}</span>
-      <span class="inadim-alerta-patient-info">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}</span>
-    </div>`
-  ).join('')}</div>`;
-  const items = [];
-  if (overduePromises.length) {
-    items.push(`<div class="inadim-alerta-section inadim-alerta-overdue">
-      <div class="inadim-alerta-item-header"><span class="inad-alert-dot inad-alert-dot-red"></span><strong>${overduePromises.length} paciente${overduePromises.length > 1 ? 's' : ''} com prazo de pagamento vencido</strong></div>
-      ${patientList(overduePromises)}
-    </div>`);
+  const pendentes = S.data.recebimentos
+    .filter(r => r.status === 'pendente' && r.date <= todayStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  setCount('badge-inadim-card', pendentes.length);
+
+  if (!pendentes.length) {
+    list.innerHTML = '<div class="empty-state">Sem inadimplências registradas. 🎉</div>';
+    return;
   }
-  if (noResponse.length) {
-    items.push(`<div class="inadim-alerta-section inadim-alerta-noresponse">
-      <div class="inadim-alerta-item-header"><span class="inad-alert-dot inad-alert-dot-gray"></span><strong>${noResponse.length} paciente${noResponse.length > 1 ? 's' : ''} sem resposta</strong></div>
-      ${patientList(noResponse)}
-    </div>`);
-  }
-  el('inadim-alerta-list').innerHTML = items.join('');
+
+  list.innerHTML = pendentes.map(r => {
+    const dias = daysBetween(r.date, todayStr);
+    const daysCls = dias <= 7 ? 'days-ok' : dias <= 30 ? 'days-warning' : 'days-danger';
+    const pat = r.patientId ? S.data.patients.find(p => p.id === r.patientId) : null;
+    const nameHtml = r.patientId
+      ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>`
+      : `<span>${esc(r.patient||'—')}</span>`;
+    const contactStatus = r.contactStatus || 'none';
+    const isOverdue = contactStatus === 'promised' && r.promisedDate && r.promisedDate < todayStr;
+    const contactOpts = [['none','Sem tentativa'],['promised','Prometeu pagar'],['no-response','Sem resposta']]
+      .map(([v, l]) => `<option value="${v}"${contactStatus === v ? ' selected' : ''}>${l}</option>`).join('');
+    const dateInput = contactStatus === 'promised'
+      ? `<input type="date" class="inad-promised-date" data-id="${r.id}" value="${r.promisedDate||''}">`
+      : '';
+    return `<div class="inadim-card-item${isOverdue ? ' inadim-card-overdue' : ''}">
+      <div class="inadim-card-row1">
+        <div class="inadim-card-name-wrap">${nameHtml}${pat?.phone ? waBtn(pat.phone) : ''}</div>
+        <div class="inadim-card-meta-right">
+          <span class="days-badge ${daysCls}">${dias}d</span>
+          <span class="inadim-card-value">${fmtBRL(r.value||0)}</span>
+        </div>
+      </div>
+      <div class="inadim-card-row2">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}</div>
+      <div class="inadim-card-row3">
+        <div class="inad-contact-wrap" style="min-width:unset;flex:1">
+          <select class="inad-contact-sel" data-id="${r.id}">${contactOpts}</select>
+          ${dateInput}
+        </div>
+        <button class="btn-received" data-id="${r.id}" data-action="mark-received" style="font-size:.75rem;padding:4px 10px;white-space:nowrap">✓ Recebido</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderAniversariantesMes() {
@@ -2239,14 +2257,16 @@ function renderNFPendentes() {
       nfList.innerHTML = '<div class="empty-state">Nenhuma NF emitida registrada.</div>';
       return;
     }
-    nfList.innerHTML = emitidas.map(r => `
-      <div class="nf-item">
+    nfList.innerHTML = emitidas.map(r => {
+      const nameHtml = r.patientId ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>` : esc(r.patient||'—');
+      return `<div class="nf-item">
         <div class="nf-item-left">
-          <div class="nf-item-name">${esc(r.patient||'—')}</div>
+          <div class="nf-item-name">${nameHtml}</div>
           <div class="nf-item-meta">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}${r.invoiceNumber ? ` · NF ${esc(r.invoiceNumber)}` : ''}</div>
         </div>
         <div class="nf-item-value">${fmtBRL(r.value||0)}</div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
     return;
   }
 
@@ -2264,12 +2284,13 @@ function renderNFPendentes() {
 
   nfList.innerHTML = pendNF.map(r => {
     const sel = S.nfSelected.has(r.id);
+    const nameHtml = r.patientId ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>` : esc(r.patient||'—');
     return `<div class="nf-item${sel ? ' nf-selected' : ''}">
       <label class="nf-item-check" onclick="event.stopPropagation()">
         <input type="checkbox" class="row-check nf-check" data-id="${r.id}" ${sel ? 'checked' : ''}>
       </label>
       <div class="nf-item-left">
-        <div class="nf-item-name">${esc(r.patient||'—')}</div>
+        <div class="nf-item-name">${nameHtml}</div>
         <div class="nf-item-meta">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">

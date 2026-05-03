@@ -437,18 +437,16 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .nf-link-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: var(--radius-sm); font-size: .8rem; font-weight: 600; background: var(--primary-pale); color: var(--primary); border: 1px solid var(--border); transition: all var(--transition); text-decoration: none; }
 .nf-link-btn:hover { background: var(--primary); color: var(--white); border-color: var(--primary); text-decoration: none; }
 .badge-pill { background: var(--primary); color: var(--white); font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; min-width: 22px; text-align: center; }
-.inadim-alerta-body { display: flex; flex-direction: column; gap: 12px; padding: 8px 22px 18px; }
-#inadim-alerta-list { display: flex; flex-direction: column; gap: 10px; }
-.inadim-alerta-section { padding: 10px 14px; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 6px; }
-.inadim-alerta-overdue { background: #fff7ed; border: 1px solid #fed7aa; }
-.inadim-alerta-noresponse { background: #f9fafb; border: 1px solid var(--border); }
-.inadim-alerta-item-header { display: flex; align-items: center; gap: 8px; font-size: .84rem; }
-.inadim-alerta-overdue .inadim-alerta-item-header { color: #9a3412; }
-.inadim-alerta-noresponse .inadim-alerta-item-header { color: var(--text); }
-.inadim-alerta-patient-list { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; margin-top: 4px; border-top: 1px solid rgba(0,0,0,.07); }
-.inadim-alerta-patient { display: flex; flex-direction: column; gap: 1px; }
-.inadim-alerta-patient-name { font-size: .84rem; font-weight: 600; color: var(--text); }
-.inadim-alerta-patient-info { font-size: .75rem; color: var(--text-muted); }
+.inadim-card-list { max-height: 420px; overflow-y: auto; }
+.inadim-card-item { padding: 12px 22px; border-bottom: 1px solid var(--border-light); }
+.inadim-card-item:last-child { border-bottom: none; }
+.inadim-card-item.inadim-card-overdue { background: #fff7ed; }
+.inadim-card-row1 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.inadim-card-name-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-weight: 600; font-size: .9rem; }
+.inadim-card-meta-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.inadim-card-value { font-size: .84rem; font-weight: 700; color: var(--text); }
+.inadim-card-row2 { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
+.inadim-card-row3 { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .inad-alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .inad-alert-dot-red { background: #ef4444; }
 .inad-alert-dot-gray { background: #9ca3af; }
