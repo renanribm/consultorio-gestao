@@ -1906,7 +1906,7 @@ function renderInadimAlerta() {
       <div class="inadim-card-row1">
         <div class="inadim-card-name-wrap">${nameHtml}${pat?.phone ? waBtn(pat.phone) : ''}</div>
         <div class="inadim-card-meta-right">
-          <span class="days-badge ${daysCls}">${dias}d</span>
+          <span class="days-badge ${daysCls}">${dias} dia${dias !== 1 ? 's' : ''}</span>
           <span class="inadim-card-value">${fmtBRL(r.value||0)}</span>
         </div>
       </div>

@@ -367,9 +367,9 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
   .inadimplencia-summary { display: flex; flex-direction: column; gap: 4px; }
 }
 .days-badge { font-size: .78rem; font-weight: 700; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
-.days-ok      { background: #d1fae5; color: #065f46; }
-.days-warning { background: var(--amber-bg); color: #92400e; }
-.days-danger  { background: var(--red-bg); color: #991b1b; }
+.days-ok      { background: #fee2e2; color: #b91c1c; }
+.days-warning { background: #fca5a5; color: #7f1d1d; }
+.days-danger  { background: #dc2626; color: #fff; }
 .inad-contact-wrap { display: flex; flex-direction: column; gap: 4px; min-width: 148px; }
 .inad-contact-sel { font-size: .76rem; padding: 4px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--white); color: var(--text); cursor: pointer; width: 100%; }
 .inad-promised-date { font-size: .75rem; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--white); color: var(--text); width: 100%; }
