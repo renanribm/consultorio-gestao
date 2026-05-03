@@ -166,7 +166,7 @@ function navigateTo(view, { pushHistory = true, replace = false } = {}) {
   const target = el('view-' + view);
   if (target) target.classList.remove('hidden');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === view));
-  el('filter-bar').classList.toggle('hidden', ['import','paciente-detalhe','agenda','pacientes'].includes(view));
+  el('filter-bar').classList.toggle('hidden', ['import','paciente-detalhe','agenda','pacientes','secretaria'].includes(view));
   renderView(view);
 }
 
