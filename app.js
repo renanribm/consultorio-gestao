@@ -1752,8 +1752,11 @@ document.addEventListener('change', e => {
     }
     return;
   }
+});
+
+document.addEventListener('focusout', e => {
   const dateInp = e.target.closest('.inad-promised-date');
-  if (dateInp && dateInp.value) {
+  if (dateInp && dateInp.value && dateInp.value.split('-')[0]?.length === 4) {
     saveInadimContact(dateInp.dataset.id, 'promised', dateInp.value);
   }
 });
@@ -1889,12 +1892,24 @@ function renderInadimAlerta() {
   const noResponse = pendentes.filter(r => r.contactStatus === 'no-response');
   if (!overduePromises.length && !noResponse.length) { card.classList.add('hidden'); return; }
   card.classList.remove('hidden');
+  const patientList = recs => `<div class="inadim-alerta-patient-list">${recs.map(r =>
+    `<div class="inadim-alerta-patient">
+      <span class="inadim-alerta-patient-name">${esc(r.patient||'—')}</span>
+      <span class="inadim-alerta-patient-info">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}</span>
+    </div>`
+  ).join('')}</div>`;
   const items = [];
   if (overduePromises.length) {
-    items.push(`<div class="inadim-alerta-item inadim-alerta-overdue"><span class="inad-alert-dot inad-alert-dot-red"></span><span><strong>${overduePromises.length}</strong> paciente${overduePromises.length > 1 ? 's' : ''} com prazo de pagamento vencido</span></div>`);
+    items.push(`<div class="inadim-alerta-section inadim-alerta-overdue">
+      <div class="inadim-alerta-item-header"><span class="inad-alert-dot inad-alert-dot-red"></span><strong>${overduePromises.length} paciente${overduePromises.length > 1 ? 's' : ''} com prazo de pagamento vencido</strong></div>
+      ${patientList(overduePromises)}
+    </div>`);
   }
   if (noResponse.length) {
-    items.push(`<div class="inadim-alerta-item inadim-alerta-noresponse"><span class="inad-alert-dot inad-alert-dot-gray"></span><span><strong>${noResponse.length}</strong> paciente${noResponse.length > 1 ? 's' : ''} sem resposta</span></div>`);
+    items.push(`<div class="inadim-alerta-section inadim-alerta-noresponse">
+      <div class="inadim-alerta-item-header"><span class="inad-alert-dot inad-alert-dot-gray"></span><strong>${noResponse.length} paciente${noResponse.length > 1 ? 's' : ''} sem resposta</strong></div>
+      ${patientList(noResponse)}
+    </div>`);
   }
   el('inadim-alerta-list').innerHTML = items.join('');
 }
