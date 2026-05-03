@@ -507,7 +507,7 @@ async function saveNota(data, id = null) {
   showLoading();
   try {
     if (id) { await updateDoc(doc(db, 'notas', id), { ...data, updatedAt: serverTimestamp() }); }
-    else    { await addDoc(collection(db, 'notas'), { ...data, createdAt: serverTimestamp(), createdBy: S.user.uid }); }
+    else    { await addDoc(collection(db, 'notas'), { ...data, createdAt: serverTimestamp(), createdBy: S.user.uid, createdByEmail: S.user.email }); }
     await reloadCollection('notas');
     showToast('Anotação salva!', 'success');
   } catch (err) { handleErr(err); } finally { hideLoading(); }
@@ -2322,7 +2322,7 @@ function renderNotas() {
     <div class="nota-item">
       <div class="nota-content">${esc(n.content||'')}</div>
       <div class="nota-meta">
-        <span>${n.createdAt ? fmtTimestamp(n.createdAt) : ''}</span>
+        <span>${n.createdAt ? fmtTimestamp(n.createdAt) : ''}${n.createdByEmail ? ` · ${n.createdByEmail.split('@')[0]}` : ''}</span>
         <div class="nota-actions">
           <button class="btn btn-sm btn-outline" data-id="${n.id}" data-action="edit-nota">Editar</button>
           <button class="btn btn-sm btn-danger"  data-id="${n.id}" data-action="del-nota">Excluir</button>
