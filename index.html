@@ -432,11 +432,11 @@
                 <tr>
                   <th style="width:36px"></th>
                   <th>Data</th><th>Paciente</th><th>Tipo</th>
-                  <th class="text-right">Valor</th><th>Dias em Aberto</th><th>Ações</th>
+                  <th class="text-right">Valor</th><th>Dias em Aberto</th><th>Contato</th><th>Ações</th>
                 </tr>
               </thead>
               <tbody id="tbody-inadimplencia">
-                <tr><td colspan="7" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>
+                <tr><td colspan="8" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>
               </tbody>
             </table>
           </div>
@@ -464,6 +464,14 @@
               <h3 id="aniversario-mes-titulo">Aniversariantes do Mês</h3>
             </div>
             <div class="aniversario-mes-list" id="aniversario-mes-list"></div>
+          </div>
+
+          <!-- Alertas de Inadimplência -->
+          <div class="card sec-card sec-card-wide hidden" id="card-inadim-alerta">
+            <div class="inadim-alerta-bar">
+              <div class="inadim-alerta-items" id="inadim-alerta-list"></div>
+              <a class="alert-link btn btn-sm btn-outline" data-view="inadimplencia" style="flex-shrink:0;cursor:pointer">Ver inadimplência →</a>
+            </div>
           </div>
 
           <!-- NFs Pendentes -->

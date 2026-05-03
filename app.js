@@ -465,6 +465,20 @@ async function markReceived(id) {
   } catch (err) { handleErr(err); } finally { hideLoading(); }
 }
 
+async function saveInadimContact(id, contactStatus, promisedDate) {
+  const update = { contactStatus, updatedAt: serverTimestamp() };
+  if (contactStatus === 'promised' && promisedDate) update.promisedDate = promisedDate;
+  else update.promisedDate = deleteField();
+  showLoading();
+  try {
+    await updateDoc(doc(db, 'recebimentos', id), update);
+    const rec = S.data.recebimentos.find(r => r.id === id);
+    if (rec) { rec.contactStatus = contactStatus; rec.promisedDate = promisedDate || null; }
+    if (S.view === 'inadimplencia') renderInadimplencia();
+    if (S.view === 'secretaria') renderInadimAlerta();
+  } catch (err) { handleErr(err); } finally { hideLoading(); }
+}
+
 // ── Despesas ──────────────────────────────────────────────
 async function saveDespesa(data, id = null) {
   showLoading();
@@ -1653,7 +1667,7 @@ function renderInadimplencia() {
 
   if (!pendentes.length) {
     if (bulkBar) bulkBar.classList.add('hidden');
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="empty-row">Nenhum pagamento pendente. 🎉</td></tr>';
     return;
   }
 
@@ -1668,13 +1682,22 @@ function renderInadimplencia() {
     const patCell = r.patientId
       ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>`
       : esc(r.patient||'—');
-    return `<tr class="${sel ? 'row-selected' : ''}">
+    const contactStatus = r.contactStatus || 'none';
+    const isOverduePromise = contactStatus === 'promised' && r.promisedDate && r.promisedDate < today_;
+    const rowCls = sel ? 'row-selected' : isOverduePromise ? 'inad-overdue-promise' : '';
+    const contactOpts = [['none','Sem tentativa'],['promised','Prometeu pagar'],['no-response','Sem resposta']]
+      .map(([v,l]) => `<option value="${v}"${contactStatus===v?' selected':''}>${l}</option>`).join('');
+    const dateInput = contactStatus === 'promised'
+      ? `<input type="date" class="inad-promised-date" data-id="${r.id}" value="${r.promisedDate||''}">`
+      : '';
+    return `<tr class="${rowCls}">
       <td style="padding:10px 8px"><input type="checkbox" class="row-check inadim-check" data-id="${r.id}" ${sel ? 'checked' : ''}></td>
       <td>${fmtDate(r.date)}</td>
       <td>${patCell}</td>
       <td><span class="type-tag">${labels.consultationType[r.consultationType]||r.consultationType||'—'}</span></td>
       <td class="text-right value-cell">${fmtBRL(r.value||0)}</td>
       <td><span class="days-badge ${daysCls}">${dias} dia${dias!==1?'s':''}</span></td>
+      <td><div class="inad-contact-wrap"><select class="inad-contact-sel" data-id="${r.id}">${contactOpts}</select>${dateInput}</div></td>
       <td><button class="btn-received" data-id="${r.id}" data-action="mark-received">✓ Marcar Recebido</button></td>
     </tr>`;
   }).join('');
@@ -1709,6 +1732,30 @@ document.addEventListener('change', e => {
   const t = today();
   if (sel.value === 'nao-quer') dateInput.value = dateAddDays(t, 30);
   else if (sel.value !== 'data-especifica') dateInput.value = dateAddDays(t, 7);
+});
+
+document.addEventListener('change', e => {
+  const contactSel = e.target.closest('.inad-contact-sel');
+  if (contactSel) {
+    const id = contactSel.dataset.id;
+    const status = contactSel.value;
+    const wrap = contactSel.closest('.inad-contact-wrap');
+    if (status === 'promised') {
+      if (!wrap.querySelector('.inad-promised-date')) {
+        const inp = document.createElement('input');
+        inp.type = 'date'; inp.className = 'inad-promised-date'; inp.dataset.id = id;
+        wrap.appendChild(inp);
+      }
+    } else {
+      wrap.querySelector('.inad-promised-date')?.remove();
+      saveInadimContact(id, status, null);
+    }
+    return;
+  }
+  const dateInp = e.target.closest('.inad-promised-date');
+  if (dateInp && dateInp.value) {
+    saveInadimContact(dateInp.dataset.id, 'promised', dateInp.value);
+  }
 });
 
 el('btn-inativacao-sort').addEventListener('click', () => {
@@ -1824,12 +1871,32 @@ el('form-nf').addEventListener('submit', async (e) => {
 
 function renderSecretaria() {
   S.nfTab = 'pendentes';
+  renderInadimAlerta();
   renderNFPendentes();
   renderRetornoAlert();
   renderInativacaoSugestoes();
   renderNotas();
   renderAniversariantes('aniversario-banner-sec', 'aniversario-sec-text');
   renderAniversariantesMes();
+}
+
+function renderInadimAlerta() {
+  const card = el('card-inadim-alerta');
+  if (!card) return;
+  const todayStr = today();
+  const pendentes = S.data.recebimentos.filter(r => r.status === 'pendente' && r.date <= todayStr);
+  const overduePromises = pendentes.filter(r => r.contactStatus === 'promised' && r.promisedDate && r.promisedDate < todayStr);
+  const noResponse = pendentes.filter(r => r.contactStatus === 'no-response');
+  if (!overduePromises.length && !noResponse.length) { card.classList.add('hidden'); return; }
+  card.classList.remove('hidden');
+  const items = [];
+  if (overduePromises.length) {
+    items.push(`<div class="inadim-alerta-item inadim-alerta-overdue"><span class="inad-alert-dot inad-alert-dot-red"></span><span><strong>${overduePromises.length}</strong> paciente${overduePromises.length > 1 ? 's' : ''} com prazo de pagamento vencido</span></div>`);
+  }
+  if (noResponse.length) {
+    items.push(`<div class="inadim-alerta-item inadim-alerta-noresponse"><span class="inad-alert-dot inad-alert-dot-gray"></span><span><strong>${noResponse.length}</strong> paciente${noResponse.length > 1 ? 's' : ''} sem resposta</span></div>`);
+  }
+  el('inadim-alerta-list').innerHTML = items.join('');
 }
 
 function renderAniversariantesMes() {
