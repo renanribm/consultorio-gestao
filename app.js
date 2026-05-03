@@ -297,6 +297,15 @@ function revenueForMonth(year, month) {
     .reduce((s, r) => s + (r.value || 0), 0);
 }
 
+// Valor efetivo de uma despesa: impostos são calculados dinamicamente sobre o faturamento do mês
+function resolvedValue(d) {
+  if (d.category === 'impostos' && d.taxRate && d.date) {
+    const [y, m] = d.date.split('-').map(Number);
+    return (d.taxRate / 100) * revenueForMonth(y, m);
+  }
+  return d.value || 0;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA — Firestore CRUD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -682,7 +691,7 @@ function renderDashboard() {
   const desps = filteredDesp();
   const recebida  = sumWhere(recs,  r => r.status === 'pix');
   const pendente  = sumWhere(recs,  r => r.status === 'pendente');
-  const totalDesp = desps.reduce((s, d) => s + (d.value||0), 0);
+  const totalDesp = desps.reduce((s, d) => s + resolvedValue(d), 0);
   const resultado = recebida - totalDesp;
   const margem    = recebida > 0 ? (resultado/recebida*100).toFixed(1) : 0;
   const gratuitos = recs.filter(r => r.status === 'gratuito').length;
@@ -750,7 +759,7 @@ function getMonthlyData(n) {
     const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     const lbl = d.toLocaleDateString('pt-BR',{month:'short',year:'2-digit'}).replace('.','');
     const receita = S.data.recebimentos.filter(r=>r.status==='pix'&&r.date?.startsWith(key)).reduce((s,r)=>s+(r.value||0),0);
-    const despesa = S.data.despesas.filter(r=>r.date?.startsWith(key)).reduce((s,r)=>s+(r.value||0),0);
+    const despesa = S.data.despesas.filter(r=>r.date?.startsWith(key)).reduce((s,r)=>s+resolvedValue(r),0);
     return { label:lbl, receita, despesa };
   });
 }
@@ -1473,9 +1482,9 @@ el('form-desp').addEventListener('submit', async (e) => {
     const monthPreviews = Array.from({ length: 12 }, (_, i) => {
       const dt  = new Date(baseY, baseM - 1 + i, 1);
       const rev = revenueForMonth(dt.getFullYear(), dt.getMonth() + 1);
-      return { dt, rev, value: (taxRate / 100) * rev };
+      return { dt, estimatedValue: (taxRate / 100) * rev };
     });
-    const totalVal = monthPreviews.reduce((s, mp) => s + mp.value, 0);
+    const totalVal = monthPreviews.reduce((s, mp) => s + mp.estimatedValue, 0);
     showConfirm(
       `Isso vai criar 12 lançamentos mensais de imposto (${taxRate}%), calculados sobre o faturamento de cada mês individualmente. Total estimado: ${fmtBRL(totalVal)}. Confirmar?`,
       async () => {
@@ -1483,11 +1492,11 @@ el('form-desp').addEventListener('submit', async (e) => {
         showLoading();
         try {
           const batch = writeBatch(db);
-          for (const { dt, value } of monthPreviews) {
+          for (const { dt } of monthPreviews) {
             const pad = n => String(n).padStart(2, '0');
             const dateStr = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(baseDate.split('-')[2])}`;
             batch.set(doc(collection(db, 'despesas')), {
-              ...baseData, date: dateStr, value, createdAt: serverTimestamp(), createdBy: S.user.uid,
+              ...baseData, date: dateStr, createdAt: serverTimestamp(), createdBy: S.user.uid,
             });
           }
           await batch.commit();
@@ -1504,8 +1513,7 @@ el('form-desp').addEventListener('submit', async (e) => {
   let value;
   if (isImposto) {
     taxRate = parseFloat(el('desp-pct').value) || 0;
-    const grossRevenue = revenueForMonth(baseY, baseM);
-    value = (taxRate / 100) * grossRevenue;
+    value   = null; // calculado dinamicamente via resolvedValue
   } else {
     value = parseFloat(el('desp-valor').value) || 0;
   }
@@ -1515,7 +1523,7 @@ el('form-desp').addEventListener('submit', async (e) => {
     description: el('desp-desc').value.trim(),
     category:    el('desp-cat').value,
     recurrence:  el('desp-rec').value,
-    value,
+    ...(isImposto ? {} : { value }),
     taxRate:     taxRate ?? null,
   };
 
@@ -1575,7 +1583,7 @@ function renderDespesas() {
       case 'description': return mult * (a.description||'').localeCompare(b.description||'', 'pt-BR', { sensitivity: 'base' });
       case 'category':    return mult * (a.category||'').localeCompare(b.category||'');
       case 'recurrence':  return mult * (a.recurrence||'').localeCompare(b.recurrence||'');
-      case 'value':       return mult * ((a.value||0) - (b.value||0));
+      case 'value':       return mult * (resolvedValue(a) - resolvedValue(b));
       default:            return 0;
     }
   });
@@ -1585,7 +1593,7 @@ function renderDespesas() {
     else th.removeAttribute('data-dir');
   });
 
-  const total = desps.reduce((s,d)=>s+(d.value||0),0);
+  const total = desps.reduce((s,d)=>s+resolvedValue(d),0);
   el('summary-desp').innerHTML = `${desps.length} reg. &nbsp;|&nbsp; Total: <strong>${fmtBRL(total)}</strong>`;
 
   const tbody = el('tbody-desp');
@@ -1595,7 +1603,7 @@ function renderDespesas() {
     <td>${esc(d.description||'—')}</td>
     <td><span class="cat-tag">${labels.expenseCategory[d.category]||d.category||'—'}</span></td>
     <td><span class="cat-tag">${labels.recurrence[d.recurrence]||'Única'}</span></td>
-    <td class="text-right value-cell" style="color:var(--red)">${fmtBRL(d.value||0)}${d.taxRate ? `<span style="font-size:.75rem;color:var(--text-muted);margin-left:4px">(${d.taxRate}%)</span>` : ''}</td>
+    <td class="text-right value-cell" style="color:var(--red)">${fmtBRL(resolvedValue(d))}${d.taxRate ? `<span style="font-size:.75rem;color:var(--text-muted);margin-left:4px">(${d.taxRate}%)</span>` : ''}</td>
     <td><div class="action-btns">
       <button class="btn-edit" data-id="${d.id}" data-action="edit-desp">Editar</button>
       <button class="btn-del" data-id="${d.id}" data-action="del-desp">Excluir</button>
@@ -2266,7 +2274,7 @@ function renderDRE() {
 
   const catOrder  = ['aluguel','iclinic','secretaria','contador','material','impostos','outros'];
   const despByCat = Object.fromEntries(catOrder.map(c=>[c,0]));
-  desps.forEach(d => { despByCat[d.category] = (despByCat[d.category]||0)+(d.value||0); });
+  desps.forEach(d => { despByCat[d.category] = (despByCat[d.category]||0)+resolvedValue(d); });
   const totalDesp = Object.values(despByCat).reduce((s,v)=>s+v,0);
 
   const resultado = totalRec - totalDesp;
@@ -3315,7 +3323,7 @@ function exportDespesas() {
     d.description || '',
     labels.expenseCategory[d.category] || d.category || '',
     labels.recurrence[d.recurrence] || d.recurrence || '',
-    (d.value || 0).toFixed(2).replace('.', ','),
+    resolvedValue(d).toFixed(2).replace('.', ','),
   ]);
   downloadCSV(`despesas_${today()}.csv`, headers, rows);
 }
