@@ -1917,7 +1917,7 @@ function renderInadimAlerta() {
           ${dateInput}
         </div>
         <button class="btn btn-sm btn-outline" data-id="${r.id}" data-action="inadim-save-contact" style="white-space:nowrap">Salvar</button>
-        <button class="btn-received" data-id="${r.id}" data-action="mark-received" style="font-size:.75rem;padding:4px 10px;white-space:nowrap">✓ Recebido</button>
+        <button class="btn-received" data-id="${r.id}" data-action="mark-received" style="font-size:.75rem;padding:4px 10px;white-space:nowrap">✓ Marcar como recebido</button>
       </div>
     </div>`;
   }).join('');
