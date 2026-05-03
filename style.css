@@ -438,20 +438,21 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .nf-link-btn:hover { background: var(--primary); color: var(--white); border-color: var(--primary); text-decoration: none; }
 .badge-pill { background: var(--primary); color: var(--white); font-size: .75rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; min-width: 22px; text-align: center; }
 .inadim-card-list { max-height: 420px; overflow-y: auto; }
-.inadim-card-item { padding: 12px 22px; border-bottom: 1px solid var(--border-light); }
+.inadim-card-item { padding: 11px 16px; border-bottom: 1px solid var(--border-light); }
 .inadim-card-item:last-child { border-bottom: none; }
 .inadim-card-item.inadim-card-overdue { background: #fff7ed; }
-.inadim-card-row1 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.inadim-card-name-wrap { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-weight: 600; font-size: .9rem; }
-.inadim-card-meta-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.inadim-card-value { font-size: .84rem; font-weight: 700; color: var(--text); }
-.inadim-card-row2 { font-size: .75rem; color: var(--text-muted); margin-top: 2px; }
-.inadim-card-row3 { display: flex; align-items: flex-start; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.inadim-card-row1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inadim-card-name-wrap { display: flex; align-items: center; gap: 5px; min-width: 0; font-weight: 600; font-size: .84rem; overflow: hidden; }
+.inadim-card-name-wrap span:first-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inadim-card-meta-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.inadim-card-value { font-size: .8rem; font-weight: 700; color: var(--text); white-space: nowrap; }
+.inadim-card-row2 { font-size: .73rem; color: var(--text-muted); margin-top: 2px; }
+.inadim-card-row3 { display: flex; align-items: center; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
 .inad-alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .inad-alert-dot-red { background: #ef4444; }
 .inad-alert-dot-gray { background: #9ca3af; }
 
-.nf-list { max-height: 280px; overflow-y: auto; }
+.nf-list { max-height: 420px; overflow-y: auto; }
 .nf-item { display: flex; align-items: center; justify-content: space-between; padding: 11px 22px; border-bottom: 1px solid var(--border-light); gap: 12px; font-size: .83rem; }
 .nf-item:last-child { border-bottom: none; }
 .nf-item-left { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }

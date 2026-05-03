@@ -375,6 +375,7 @@ function updateBadges() {
   const todayStr = today();
   const pendRec = S.data.recebimentos.filter(r => r.status === 'pendente' && r.date <= todayStr);
   const pendNF  = S.data.recebimentos.filter(r => r.invoiceStatus === 'pendente' && r.status !== 'gratuito' && r.date <= todayStr);
+  setCount('badge-inadimplencia', pendRec.length);
   setCount('badge-inadim-card', pendRec.length);
   setCount('badge-nf', pendNF.length);
   setCount('badge-retorno', calcRetornoPatients().filter(p => p.needsContact).length);
@@ -1737,27 +1738,16 @@ document.addEventListener('change', e => {
 document.addEventListener('change', e => {
   const contactSel = e.target.closest('.inad-contact-sel');
   if (contactSel) {
-    const id = contactSel.dataset.id;
-    const status = contactSel.value;
     const wrap = contactSel.closest('.inad-contact-wrap');
-    if (status === 'promised') {
+    if (contactSel.value === 'promised') {
       if (!wrap.querySelector('.inad-promised-date')) {
         const inp = document.createElement('input');
-        inp.type = 'date'; inp.className = 'inad-promised-date'; inp.dataset.id = id;
+        inp.type = 'date'; inp.className = 'inad-promised-date'; inp.dataset.id = contactSel.dataset.id;
         wrap.appendChild(inp);
       }
     } else {
       wrap.querySelector('.inad-promised-date')?.remove();
-      saveInadimContact(id, status, null);
     }
-    return;
-  }
-});
-
-document.addEventListener('focusout', e => {
-  const dateInp = e.target.closest('.inad-promised-date');
-  if (dateInp && dateInp.value && dateInp.value.split('-')[0]?.length === 4) {
-    saveInadimContact(dateInp.dataset.id, 'promised', dateInp.value);
   }
 });
 
@@ -1922,10 +1912,11 @@ function renderInadimAlerta() {
       </div>
       <div class="inadim-card-row2">${fmtDate(r.date)} · ${labels.consultationType[r.consultationType]||r.consultationType||'—'}</div>
       <div class="inadim-card-row3">
-        <div class="inad-contact-wrap" style="min-width:unset;flex:1">
-          <select class="inad-contact-sel" data-id="${r.id}">${contactOpts}</select>
+        <div class="inad-contact-wrap" style="min-width:unset">
+          <select class="inad-contact-sel" style="width:148px" data-id="${r.id}">${contactOpts}</select>
           ${dateInput}
         </div>
+        <button class="btn btn-sm btn-outline" data-id="${r.id}" data-action="inadim-save-contact" style="white-space:nowrap">Salvar</button>
         <button class="btn-received" data-id="${r.id}" data-action="mark-received" style="font-size:.75rem;padding:4px 10px;white-space:nowrap">✓ Recebido</button>
       </div>
     </div>`;
@@ -2068,10 +2059,19 @@ function renderRetornoAlert() {
   if (pill) pill.textContent = todos.length;
   const badge = el('badge-retorno');
   if (badge) { badge.textContent = urgentes.length || ''; badge.classList.toggle('hidden', urgentes.length === 0); }
+  const inadimContactar = S.data.recebimentos.filter(r => {
+    if (r.status !== 'pendente' || r.date > todayStr) return false;
+    const cs = r.contactStatus || 'none';
+    return cs === 'none' || cs === 'no-response' || (cs === 'promised' && r.promisedDate && r.promisedDate <= todayStr);
+  }).length;
   const banner = el('retorno-banner');
   if (banner) {
-    if (urgentes.length) {
-      el('retorno-banner-text').textContent = `${urgentes.length} paciente${urgentes.length > 1 ? 's' : ''} para contatar hoje.`;
+    const total = urgentes.length + inadimContactar;
+    if (total) {
+      const parts = [];
+      if (urgentes.length) parts.push(`${urgentes.length} sem retorno agendado`);
+      if (inadimContactar) parts.push(`${inadimContactar} inadimplente${inadimContactar > 1 ? 's' : ''}`);
+      el('retorno-banner-text').textContent = `${total} paciente${total > 1 ? 's' : ''} para contatar hoje — ${parts.join(' e ')}.`;
       banner.classList.remove('hidden');
     } else {
       banner.classList.add('hidden');
@@ -3209,6 +3209,12 @@ document.addEventListener('click', (e) => {
   else if (action === 'edit-desp')      { const d = S.data.despesas.find(d=>d.id===id); if(d) openModalDesp(d); }
   else if (action === 'del-desp')       { deleteDesp(id); }
   else if (action === 'mark-received')  { markReceived(id); }
+  else if (action === 'inadim-save-contact') {
+    const item = btn.closest('.inadim-card-item');
+    const sel  = item?.querySelector('.inad-contact-sel');
+    const dateInp = item?.querySelector('.inad-promised-date');
+    if (sel) saveInadimContact(id, sel.value, dateInp?.value || null);
+  }
   else if (action === 'mark-nf')        { el('nf-rec-id').value=''; el('nf-numero').value=''; el('nf-rec-id').value=id; openModal('modal-nf'); }
   else if (action === 'edit-nota')      { const n = S.data.notas.find(n=>n.id===id); if(n) openModalNota(n); }
   else if (action === 'del-nota')       { deleteNota(id); }
