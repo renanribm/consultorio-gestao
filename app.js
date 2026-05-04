@@ -1684,7 +1684,7 @@ function renderInadimplencia() {
       ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>`
       : esc(r.patient||'—');
     const contactStatus = r.contactStatus || 'none';
-    const isOverduePromise = contactStatus === 'promised' && r.promisedDate && r.promisedDate < today_;
+    const isOverduePromise = (contactStatus === 'promised' && r.promisedDate && r.promisedDate < today_) || contactStatus === 'no-response';
     const rowCls = sel ? 'row-selected' : isOverduePromise ? 'inad-overdue-promise' : '';
     const contactOpts = [['none','Sem tentativa'],['promised','Prometeu pagar'],['no-response','Sem resposta']]
       .map(([v,l]) => `<option value="${v}"${contactStatus===v?' selected':''}>${l}</option>`).join('');
@@ -1896,7 +1896,7 @@ function renderInadimAlerta() {
       ? `<span class="patient-link" data-patient="${r.patientId}">${esc(r.patient||'—')}</span>`
       : `<span>${esc(r.patient||'—')}</span>`;
     const contactStatus = r.contactStatus || 'none';
-    const isOverdue = contactStatus === 'promised' && r.promisedDate && r.promisedDate < todayStr;
+    const isOverdue = (contactStatus === 'promised' && r.promisedDate && r.promisedDate < todayStr) || contactStatus === 'no-response';
     const contactOpts = [['none','Sem tentativa'],['promised','Prometeu pagar'],['no-response','Sem resposta']]
       .map(([v, l]) => `<option value="${v}"${contactStatus === v ? ' selected' : ''}>${l}</option>`).join('');
     const dateInput = contactStatus === 'promised'
