@@ -3383,7 +3383,13 @@ document.addEventListener('change', (e) => {
 function el(id)             { return document.getElementById(id); }
 function setText(id, txt)   { const e=el(id); if(e) e.textContent=txt; }
 function esc(str)           { return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function today()            { return new Date().toISOString().split('T')[0]; }
+function today() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
 function fmtBRL(v)          { return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v||0); }
 function fmtBRLShort(v)     { return v>=1000?'R$'+(v/1000).toFixed(0)+'k':fmtBRL(v); }
 function fmtDate(d)         { if(!d)return'—'; const[y,m,dy]=d.split('-'); return`${dy}/${m}/${y}`; }
