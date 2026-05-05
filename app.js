@@ -235,7 +235,7 @@ async function renderImportTab() {
     } else {
       infoEl.innerHTML = '<div class="import-last-info import-last-info-empty">Nenhuma importação registrada ainda.</div>';
     }
-  } catch { infoEl.innerHTML = ''; }
+  } catch { infoEl.innerHTML = '<div class="import-last-info import-last-info-empty">Não foi possível carregar o histórico de importações.</div>'; }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
