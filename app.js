@@ -2581,7 +2581,7 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, recAdded:0, recSkipped:0, recRescheduled:0, unmatched:[], errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsNoChange:0, patientsProtected:0, eventsAdded:0, eventsUpdated:0, eventsNoChange:0, eventsIgnored:0, recAdded:0, recSkipped:0, recRescheduled:0, unmatched:[], errors:0 };
 
   try {
     // ── 1. Pre-parse files + build iClinic name map ───────────────────────────
@@ -2638,17 +2638,23 @@ async function runImport() {
         const existing = existingMap[icId];
         if (existing) {
           if (existing.manuallyEdited) {
-            // Curado manualmente: só atualiza IDs de vínculo — preserva status, nome e todos os dados curados
+            // Curado manualmente: só atualiza IDs de vínculo — preserva todos os dados corrigidos
             await updateDoc(doc(db, 'patients', existing.id), {
               iclinicPatientId: icId,
               iclinicPk:        r.pk || '',
               updatedAt:        serverTimestamp(),
             });
-            results.patientsSkipped++;
+            results.patientsProtected++;
           } else {
-            // updateDoc não apaga campos ausentes, então manterAtivoDesde é preservado automaticamente
-            await updateDoc(doc(db, 'patients', existing.id), { ...data, updatedAt: serverTimestamp() });
-            results.patientsUpdated++;
+            const compareFields = ['name','phone','phone2','email','cpf','gender','birthDate','status','notes','indication','iclinicPk'];
+            const changed = compareFields.some(f => (data[f] ?? '') !== (existing[f] ?? ''));
+            if (changed) {
+              // updateDoc não apaga campos ausentes, então ativoDesde é preservado automaticamente
+              await updateDoc(doc(db, 'patients', existing.id), { ...data, updatedAt: serverTimestamp() });
+              results.patientsUpdated++;
+            } else {
+              results.patientsNoChange++;
+            }
           }
         } else {
           await addDoc(collection(db, 'patients'), { ...data, createdAt: serverTimestamp(), createdBy: S.user.uid });
@@ -2707,10 +2713,15 @@ async function runImport() {
 
         if (existingConsult[eventId]) {
           const ex = existingConsult[eventId];
-          // Preserva patientId/patientName se foram corrigidos manualmente
           const patUpdate = ex.patientId ? {} : { patientId: patDocId, patientName: patName };
-          await updateDoc(doc(db, 'consultations', ex.id), { ...consultData, ...patUpdate, updatedAt: serverTimestamp() });
-          results.eventsUpdated++;
+          const compareFields = ['date','status','startTime','endTime','consultationType','notes'];
+          const changed = Object.keys(patUpdate).length > 0 || compareFields.some(f => (consultData[f] ?? '') !== (ex[f] ?? ''));
+          if (changed) {
+            await updateDoc(doc(db, 'consultations', ex.id), { ...consultData, ...patUpdate, updatedAt: serverTimestamp() });
+            results.eventsUpdated++;
+          } else {
+            results.eventsNoChange++;
+          }
         } else {
           await addDoc(collection(db, 'consultations'), { ...consultData, patientId: patDocId, patientName: patName, createdAt: serverTimestamp() });
           results.eventsAdded++;
@@ -2813,9 +2824,9 @@ async function runImport() {
     res.className = 'import-result success';
     res.innerHTML = `
       <strong>✓ Importação concluída!</strong><br><br>
-      👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados${results.patientsSkipped ? `, ${results.patientsSkipped} com dados curados preservados` : ''}<br>
-      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
-      ${results.recAdded || results.recSkipped || results.recRescheduled ? `💳 Consultas: <strong>${results.recAdded} criadas como pendentes</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
+      👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>${results.patientsUpdated ? ` · ${results.patientsUpdated} atualizados` : ''} · ${results.patientsNoChange} sem novidades${results.patientsProtected ? ` · ${results.patientsProtected} com dados protegidos` : ''}<br>
+      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>${results.eventsUpdated ? ` · ${results.eventsUpdated} atualizados` : ''} · ${results.eventsNoChange} sem novidades${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
+      ${results.recAdded || results.recSkipped || results.recRescheduled ? `💳 Consultas: <strong>${results.recAdded} criadas</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
       ${results.unmatched.length ? `<br>⚠ ${results.unmatched.length} consulta${results.unmatched.length > 1 ? 's futuras' : ' futura'} sem paciente vinculado — revisão manual:<br><span style="font-size:.78rem;color:var(--text-muted)">${results.unmatched.map(e => `&nbsp;&nbsp;· ${fmtDate(e.date)} — ${esc(e.name)}: ${esc(e.desc)}`).join('<br>')}</span><br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
       <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Agenda</strong> e <strong>Consultas</strong>.
