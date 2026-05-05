@@ -160,6 +160,7 @@ el('btn-mobile-logout').addEventListener('click', () => signOut(auth));
 
 function navigateTo(view, { pushHistory = true, replace = false } = {}) {
   if (S.role === 'secretaria' && (view === 'dashboard' || view === 'dre')) view = 'secretaria';
+  if (view !== 'import') S.importResultActive = false;
   S.view = view;
   if (pushHistory) history[replace ? 'replaceState' : 'pushState']({ view }, '', '/' + view);
   document.querySelectorAll('section.view').forEach(s => s.classList.add('hidden'));
@@ -220,10 +221,10 @@ function renderView(view) {
   }
 }
 
-async function renderImportTab({ preserveResult = false } = {}) {
+async function renderImportTab() {
   const infoEl = el('import-last-info');
   if (!infoEl) return;
-  if (!preserveResult) {
+  if (!S.importResultActive) {
     const resultEl = el('import-result');
     if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.add('hidden'); }
   }
@@ -2822,8 +2823,9 @@ async function runImport() {
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');
     importSucceeded = true;
+    S.importResultActive = true;
     showToast('Importação concluída!', 'success');
-    renderImportTab({ preserveResult: true });
+    renderImportTab();
   } catch (err) {
     handleErr(err);
     setProgress(0, '');
