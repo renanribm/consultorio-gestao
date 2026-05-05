@@ -225,8 +225,7 @@ async function renderImportTab() {
   const infoEl = el('import-last-info');
   if (!infoEl) return;
   if (!S.importResultActive) {
-    const resultEl = el('import-result');
-    if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.add('hidden'); }
+    resetImport();
   }
   try {
     const snap = await getDoc(doc(db, 'metadata', 'lastImport'));
