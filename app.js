@@ -236,7 +236,7 @@ async function renderImportTab() {
         <span>Última importação: <strong>${ts}</strong> · <strong>${esc(d.userEmail || '—')}</strong></span>
         <span>👤 ${d.patientsAdded||0} adicionados${d.patientsUpdated ? ` · ${d.patientsUpdated} atualizados` : ''} · ${d.patientsNoChange||0} sem novidades${d.patientsProtected ? ` · ${d.patientsProtected} com dados protegidos` : ''}</span>
         <span>📅 ${d.eventsAdded||0} adicionados${d.eventsUpdated ? ` · ${d.eventsUpdated} atualizados` : ''} · ${d.eventsNoChange||0} sem novidades</span>
-        ${(d.recAdded||0) || (d.recRescheduled||0) ? `<span>💳 ${d.recAdded||0} criadas${d.recRescheduled ? ` · ${d.recRescheduled} remarcada${d.recRescheduled > 1 ? 's' : ''}` : ''}</span>` : ''}
+        ${'recAdded' in d ? `<span>💳 ${d.recAdded||0} criadas${d.recRescheduled ? ` · ${d.recRescheduled} remarcada${d.recRescheduled > 1 ? 's' : ''}` : ''} · ${d.recSkipped||0} sem novidades</span>` : ''}
       </div>`;
     } else {
       infoEl.innerHTML = '<div class="import-last-info import-last-info-empty">Nenhuma importação registrada ainda.</div>';
