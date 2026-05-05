@@ -2733,7 +2733,7 @@ async function runImport() {
         const eventId = r.pk;
         if (!eventId) continue;
         const date = parseBRDate(r.date || '') || '';
-        if (!date || date <= todayStr) continue;
+        if (!date || date < todayStr) continue;
 
         const icPatId  = r.patient_id || '';
         const patDocId = icIdToDocId[icPatId] || null;
