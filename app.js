@@ -237,7 +237,7 @@ async function renderImportTab() {
         <span>Última importação: <strong>${ts}</strong> · <strong>${esc(d.userEmail || '—')}</strong></span>
         <span>👤 ${d.patientsAdded||0} adicionados${d.patientsUpdated ? ` · ${d.patientsUpdated} atualizados` : ''} · ${d.patientsNoChange||0} sem novidades${d.patientsProtected ? ` · ${d.patientsProtected} com dados protegidos` : ''}</span>
         <span>📅 ${d.eventsAdded||0} adicionados${d.eventsUpdated ? ` · ${d.eventsUpdated} atualizados` : ''} · ${d.eventsNoChange||0} sem novidades</span>
-        ${(d.recAdded||0) || (d.recRescheduled||0) || (d.recSkipped||0) ? `<span>💳 ${d.recAdded||0} criadas${d.recRescheduled ? ` · ${d.recRescheduled} remarcada${d.recRescheduled > 1 ? 's' : ''}` : ''}${d.recSkipped ? ` · ${d.recSkipped} já existentes` : ''}</span>` : ''}
+        ${(d.recAdded||0) || (d.recRescheduled||0) ? `<span>💳 ${d.recAdded||0} criadas${d.recRescheduled ? ` · ${d.recRescheduled} remarcada${d.recRescheduled > 1 ? 's' : ''}` : ''}</span>` : ''}
       </div>`;
     } else {
       infoEl.innerHTML = '<div class="import-last-info import-last-info-empty">Nenhuma importação registrada ainda.</div>';
@@ -2833,7 +2833,7 @@ async function runImport() {
       <strong>✓ Importação concluída!</strong><br><br>
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>${results.patientsUpdated ? ` · ${results.patientsUpdated} atualizados` : ''} · ${results.patientsNoChange} sem novidades${results.patientsProtected ? ` · ${results.patientsProtected} com dados protegidos` : ''}<br>
       📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>${results.eventsUpdated ? ` · ${results.eventsUpdated} atualizados` : ''} · ${results.eventsNoChange} sem novidades${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
-      ${results.recAdded || results.recSkipped || results.recRescheduled ? `💳 Consultas: <strong>${results.recAdded} criadas</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
+      ${results.recAdded || results.recRescheduled ? `💳 Consultas: <strong>${results.recAdded} criadas</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}<br>` : ''}
       ${results.unmatched.length ? `<br>⚠ ${results.unmatched.length} consulta${results.unmatched.length > 1 ? 's futuras' : ' futura'} sem paciente vinculado — revisão manual:<br><span style="font-size:.78rem;color:var(--text-muted)">${results.unmatched.map(e => `&nbsp;&nbsp;· ${fmtDate(e.date)} — ${esc(e.name)}: ${esc(e.desc)}`).join('<br>')}</span><br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
       <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Agenda</strong> e <strong>Consultas</strong>.
