@@ -2397,8 +2397,8 @@ function renderDRE() {
   const rows = [
     ['section','RECEITAS'],
     ['subsection','Por Modalidade'],
-    ['item',`Presencial (${recCountByType.presencial} consulta${recCountByType.presencial!==1?'s':''})`,   recByType.presencial,   pct(recByType.presencial)],
-    ['item',`Teleconsulta (${recCountByType.teleconsulta} consulta${recCountByType.teleconsulta!==1?'s':''})`, recByType.teleconsulta, pct(recByType.teleconsulta)],
+    ['item',`Presencial <span style="font-size:.8em;color:var(--text-muted);font-weight:400">${recCountByType.presencial} consulta${recCountByType.presencial!==1?'s':''}</span>`,   recByType.presencial,   pct(recByType.presencial)],
+    ['item',`Teleconsulta <span style="font-size:.8em;color:var(--text-muted);font-weight:400">${recCountByType.teleconsulta} consulta${recCountByType.teleconsulta!==1?'s':''}</span>`, recByType.teleconsulta, pct(recByType.teleconsulta)],
     ['subtotal','Total Receita Bruta', totalRec, '100%'],
     ['spacer'],
     ['subsection','Por Status de Pagamento'],
