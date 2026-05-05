@@ -220,11 +220,13 @@ function renderView(view) {
   }
 }
 
-async function renderImportTab() {
+async function renderImportTab({ preserveResult = false } = {}) {
   const infoEl = el('import-last-info');
   if (!infoEl) return;
-  const resultEl = el('import-result');
-  if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.add('hidden'); }
+  if (!preserveResult) {
+    const resultEl = el('import-result');
+    if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.add('hidden'); }
+  }
   try {
     const snap = await getDoc(doc(db, 'metadata', 'lastImport'));
     if (snap.exists()) {
@@ -2577,7 +2579,7 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, recAdded:0, recSkipped:0, unmatched:[], errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsSkipped:0, eventsAdded:0, eventsUpdated:0, eventsIgnored:0, recAdded:0, recSkipped:0, recRescheduled:0, unmatched:[], errors:0 };
 
   try {
     // ── 1. Pre-parse files + build iClinic name map ───────────────────────────
@@ -2725,7 +2727,7 @@ async function runImport() {
       const existingByEventId = {};
       const existingByPatDate = {};
       S.data.recebimentos.forEach(r => {
-        if (r.iclinicEventId) existingByEventId[r.iclinicEventId] = true;
+        if (r.iclinicEventId) existingByEventId[r.iclinicEventId] = r;
         if (r.patientId && r.date) existingByPatDate[`${r.patientId}_${r.date}`] = true;
       });
 
@@ -2747,7 +2749,19 @@ async function runImport() {
           continue;
         }
 
-        if (existingByEventId[eventId] || existingByPatDate[`${patDocId}_${date}`]) {
+        const existingRec = existingByEventId[eventId];
+        if (existingRec) {
+          if (existingRec.date !== date && existingRec.status === 'pendente') {
+            await updateDoc(doc(db, 'recebimentos', existingRec.id), { date, updatedAt: serverTimestamp() });
+            existingByPatDate[`${patDocId}_${date}`] = true;
+            results.recRescheduled++;
+          } else {
+            results.recSkipped++;
+          }
+          continue;
+        }
+
+        if (existingByPatDate[`${patDocId}_${date}`]) {
           results.recSkipped++; continue;
         }
 
@@ -2799,7 +2813,7 @@ async function runImport() {
       <strong>✓ Importação concluída!</strong><br><br>
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>, ${results.patientsUpdated} atualizados${results.patientsSkipped ? `, ${results.patientsSkipped} com dados curados preservados` : ''}<br>
       📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>, ${results.eventsUpdated} atualizados${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
-      ${results.recAdded || results.recSkipped ? `💳 Consultas futuras: <strong>${results.recAdded} criadas como pendentes</strong>${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
+      ${results.recAdded || results.recSkipped || results.recRescheduled ? `💳 Consultas: <strong>${results.recAdded} criadas como pendentes</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}${results.recSkipped ? ` · ${results.recSkipped} já existentes` : ''}<br>` : ''}
       ${results.unmatched.length ? `<br>⚠ ${results.unmatched.length} consulta${results.unmatched.length > 1 ? 's futuras' : ' futura'} sem paciente vinculado — revisão manual:<br><span style="font-size:.78rem;color:var(--text-muted)">${results.unmatched.map(e => `&nbsp;&nbsp;· ${fmtDate(e.date)} — ${esc(e.name)}: ${esc(e.desc)}`).join('<br>')}</span><br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
       <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Agenda</strong> e <strong>Consultas</strong>.
@@ -2807,7 +2821,7 @@ async function runImport() {
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');
     showToast('Importação concluída!', 'success');
-    renderImportTab();
+    renderImportTab({ preserveResult: true });
   } catch (err) {
     handleErr(err);
     setProgress(0, '');
