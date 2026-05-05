@@ -235,7 +235,9 @@ async function renderImportTab() {
       const ts = d.timestamp ? fmtTimestamp(d.timestamp) : '—';
       infoEl.innerHTML = `<div class="import-last-info">
         <span>Última importação: <strong>${ts}</strong> · <strong>${esc(d.userEmail || '—')}</strong></span>
-        <span>👤 ${d.patientsAdded||0} adicionados · ${d.patientsUpdated||0} atualizados · ${d.patientsSkipped||0} preservados &nbsp;|&nbsp; 📅 ${d.eventsAdded||0} adicionados · ${d.eventsUpdated||0} atualizados</span>
+        <span>👤 ${d.patientsAdded||0} adicionados${d.patientsUpdated ? ` · ${d.patientsUpdated} atualizados` : ''} · ${d.patientsNoChange||0} sem novidades${d.patientsProtected ? ` · ${d.patientsProtected} com dados protegidos` : ''}</span>
+        <span>📅 ${d.eventsAdded||0} adicionados${d.eventsUpdated ? ` · ${d.eventsUpdated} atualizados` : ''} · ${d.eventsNoChange||0} sem novidades</span>
+        ${(d.recAdded||0) || (d.recRescheduled||0) || (d.recSkipped||0) ? `<span>💳 ${d.recAdded||0} criadas${d.recRescheduled ? ` · ${d.recRescheduled} remarcada${d.recRescheduled > 1 ? 's' : ''}` : ''}${d.recSkipped ? ` · ${d.recSkipped} já existentes` : ''}</span>` : ''}
       </div>`;
     } else {
       infoEl.innerHTML = '<div class="import-last-info import-last-info-empty">Nenhuma importação registrada ainda.</div>';
@@ -2810,13 +2812,18 @@ async function runImport() {
     // Gravar registro da última importação (falha silenciosamente se sem permissão)
     try {
       await setDoc(doc(db, 'metadata', 'lastImport'), {
-        timestamp:        serverTimestamp(),
-        userEmail:        S.user.email,
-        patientsAdded:    results.patientsAdded,
-        patientsUpdated:  results.patientsUpdated,
-        patientsSkipped:  results.patientsSkipped,
-        eventsAdded:      results.eventsAdded,
-        eventsUpdated:    results.eventsUpdated,
+        timestamp:           serverTimestamp(),
+        userEmail:           S.user.email,
+        patientsAdded:       results.patientsAdded,
+        patientsUpdated:     results.patientsUpdated,
+        patientsNoChange:    results.patientsNoChange,
+        patientsProtected:   results.patientsProtected,
+        eventsAdded:         results.eventsAdded,
+        eventsUpdated:       results.eventsUpdated,
+        eventsNoChange:      results.eventsNoChange,
+        recAdded:            results.recAdded,
+        recRescheduled:      results.recRescheduled,
+        recSkipped:          results.recSkipped,
       });
     } catch (_) { /* permissão negada para metadata — não interrompe */ }
 
