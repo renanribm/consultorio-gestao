@@ -2575,6 +2575,7 @@ async function runImport() {
   if (!patFile && !evtFile) { showToast('Nenhum arquivo válido selecionado.', 'error'); return; }
 
   S.importing = true;
+  let importSucceeded = false;
   el('import-actions-bar').classList.add('hidden');
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
@@ -2820,6 +2821,7 @@ async function runImport() {
     `;
     res.classList.remove('hidden');
     el('import-progress').classList.add('hidden');
+    importSucceeded = true;
     showToast('Importação concluída!', 'success');
     renderImportTab({ preserveResult: true });
   } catch (err) {
@@ -2830,7 +2832,7 @@ async function runImport() {
   } finally {
     S.importing = false;
     updateBadges();
-    renderView(S.view);
+    if (!importSucceeded) renderView(S.view);
   }
 }
 
