@@ -223,6 +223,8 @@ function renderView(view) {
 async function renderImportTab() {
   const infoEl = el('import-last-info');
   if (!infoEl) return;
+  const resultEl = el('import-result');
+  if (resultEl) { resultEl.innerHTML = ''; resultEl.classList.add('hidden'); }
   try {
     const snap = await getDoc(doc(db, 'metadata', 'lastImport'));
     if (snap.exists()) {
