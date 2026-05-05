@@ -2371,10 +2371,12 @@ function renderDRE() {
   const desps = filteredDesp();
   setText('dre-title', `DRE — ${drePeriodLabel()}`);
 
-  const recByType = { presencial:0, teleconsulta:0 };
+  const recByType      = { presencial:0, teleconsulta:0 };
+  const recCountByType = { presencial:0, teleconsulta:0 };
   recs.filter(r=>r.status!=='gratuito').forEach(r => {
     const t = r.consultationType || 'presencial';
-    recByType[t] = (recByType[t]||0) + (r.value||0);
+    recByType[t]      = (recByType[t]||0) + (r.value||0);
+    recCountByType[t] = (recCountByType[t]||0) + 1;
   });
   const totalRec     = Object.values(recByType).reduce((s,v)=>s+v,0);
   const recPix       = recs.filter(r=>r.status==='pix').reduce((s,r)=>s+(r.value||0),0);
@@ -2395,8 +2397,8 @@ function renderDRE() {
   const rows = [
     ['section','RECEITAS'],
     ['subsection','Por Modalidade'],
-    ['item','Presencial',     recByType.presencial,   pct(recByType.presencial)],
-    ['item','Teleconsulta',   recByType.teleconsulta, pct(recByType.teleconsulta)],
+    ['item',`Presencial (${recCountByType.presencial} consulta${recCountByType.presencial!==1?'s':''})`,   recByType.presencial,   pct(recByType.presencial)],
+    ['item',`Teleconsulta (${recCountByType.teleconsulta} consulta${recCountByType.teleconsulta!==1?'s':''})`, recByType.teleconsulta, pct(recByType.teleconsulta)],
     ['subtotal','Total Receita Bruta', totalRec, '100%'],
     ['spacer'],
     ['subsection','Por Status de Pagamento'],
@@ -2429,16 +2431,17 @@ function renderDRE() {
     return `<tr><td style="padding-left:32px">${row[1]}</td><td class="text-right">${v}</td><td class="text-right" style="color:var(--text-muted)">${row[3]||''}</td></tr>`;
   }).join('');
 
-  renderDRECharts(recByType, despByCat, catOrder);
+  renderDRECharts(recByType, recCountByType, despByCat, catOrder);
 }
 
-function renderDRECharts(recByType, despByCat, catOrder) {
+function renderDRECharts(recByType, recCountByType, despByCat, catOrder) {
+  const counts = [recCountByType.presencial, recCountByType.teleconsulta];
   const ctxRT = el('chart-rec-tipo').getContext('2d');
   if (S.charts.recTipo) S.charts.recTipo.destroy();
   S.charts.recTipo = new Chart(ctxRT, {
     type: 'doughnut',
     data: { labels:['Presencial','Teleconsulta'], datasets:[{data:[recByType.presencial,recByType.teleconsulta],backgroundColor:['#2d7a5f','#71c9a7'],borderWidth:2,borderColor:'#fff'}] },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}},tooltip:{callbacks:{label:ctx=>' '+fmtBRL(ctx.parsed)}}} },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}},tooltip:{callbacks:{label:ctx=>{const n=counts[ctx.dataIndex];return ` ${fmtBRL(ctx.parsed)} · ${n} consulta${n!==1?'s':''}`;}}}} },
   });
 
   const ctxDC = el('chart-desp-cat').getContext('2d');
@@ -2446,7 +2449,7 @@ function renderDRECharts(recByType, despByCat, catOrder) {
   S.charts.despCat = new Chart(ctxDC, {
     type: 'doughnut',
     data: { labels:catOrder.map(c=>labels.expenseCategory[c]), datasets:[{data:catOrder.map(c=>despByCat[c]||0),backgroundColor:['#e07b54','#5ba88a','#7b6ec0','#c0aa3d','#3d88c0','#4db8b8','#c03d5a','#9a9a9a'],borderWidth:2,borderColor:'#fff'}] },
-    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}}} },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom',labels:{font:{family:'Plus Jakarta Sans',size:10},boxWidth:10,padding:8}},tooltip:{callbacks:{label:ctx=>` R$ ${ctx.parsed.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}`}}} },
   });
 }
 
