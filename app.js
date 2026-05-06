@@ -688,6 +688,9 @@ async function mergePacientes(keepId, dropId) {
       }
       const extras = {};
       if (dropPac.phone && dropPac.phone !== keepPac.phone && !keepPac.phone2) extras.phone2 = dropPac.phone;
+      if (dropPac.iclinicPatientId) {
+        extras.mergedIclinicIds = [...new Set([...(keepPac.mergedIclinicIds || []), dropPac.iclinicPatientId])];
+      }
       if (Object.keys(extras).length) {
         await updateDoc(doc(db, 'patients', keepId), { ...extras, updatedAt: serverTimestamp() });
       }
@@ -2608,7 +2611,10 @@ async function runImport() {
     if (patFile) {
       const rows = parseCSV(patFile.text);
       const existingMap = {};
-      S.data.patients.forEach(p => { if (p.iclinicPatientId) existingMap[p.iclinicPatientId] = p; });
+      S.data.patients.forEach(p => {
+        if (p.iclinicPatientId) existingMap[p.iclinicPatientId] = p;
+        (p.mergedIclinicIds || []).forEach(mid => { existingMap[mid] = p; });
+      });
 
       let i = 0;
       for (const r of rows) {
@@ -2644,7 +2650,10 @@ async function runImport() {
 
         const existing = existingMap[icId];
         if (existing) {
-          if (existing.manuallyEdited) {
+          if (existing.iclinicPatientId !== icId) {
+            // ID pertence a um paciente mesclado — o sobrevivente já está no Firestore, não recriar
+            results.patientsNoChange++;
+          } else if (existing.manuallyEdited) {
             // Curado manualmente: só atualiza IDs de vínculo — preserva todos os dados corrigidos
             await updateDoc(doc(db, 'patients', existing.id), {
               iclinicPatientId: icId,
@@ -2682,12 +2691,17 @@ async function runImport() {
         icIdToDocId[p.iclinicPatientId] = p.id;
         icIdToName[p.iclinicPatientId]  = p.name;
       }
+      (p.mergedIclinicIds || []).forEach(mid => {
+        icIdToDocId[mid] = p.id;
+        icIdToName[mid]  = p.name;
+      });
     });
 
     // ── 4. Upsert consultations (calendário) ───────────────────────────────────
     if (evtFile && eventRows.length) {
       const existingConsult = {};
       S.data.consultations.forEach(c => { if (c.iclinicEventId) existingConsult[c.iclinicEventId] = c; });
+      const validPatientIds = new Set(S.data.patients.map(p => p.id));
 
       let i = 0;
       for (const r of eventRows) {
@@ -2720,7 +2734,8 @@ async function runImport() {
 
         if (existingConsult[eventId]) {
           const ex = existingConsult[eventId];
-          const patUpdate = ex.patientId ? {} : { patientId: patDocId, patientName: patName };
+          const patNeedsUpdate = !ex.patientId || !validPatientIds.has(ex.patientId);
+          const patUpdate = (patNeedsUpdate && patDocId) ? { patientId: patDocId, patientName: patName } : {};
           const compareFields = ['date','status','startTime','endTime','consultationType','notes'];
           const changed = Object.keys(patUpdate).length > 0 || compareFields.some(f => (consultData[f] ?? '') !== (ex[f] ?? ''));
           if (changed) {
