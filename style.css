@@ -612,6 +612,7 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .cal-chip-na  { background: var(--red-bg); color: #991b1b; }
 .cal-chip-co  { background: #ecfeff; color: #0e7490; }
 .cal-chip-re  { background: var(--amber-bg); color: #92400e; }
+.cal-chip-cancelado { background: #dc2626; color: #fff; text-decoration: line-through; opacity: .85; }
 .cal-chip-more  { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); font-size: .64rem; }
 .cal-chip-block { background: #f1f5f9; color: #64748b; border: 1px solid #cbd5e1; font-style: italic; }
 .calendar-detail { }
@@ -619,6 +620,8 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .cal-detail-item:last-child { border-bottom: none; }
 .cal-detail-item-clickable { cursor: pointer; transition: background var(--transition); }
 .cal-detail-item-clickable:hover { background: var(--primary-faint); }
+.cal-detail-item-cancelado { background: #fef2f2; }
+.cal-detail-item-cancelado.cal-detail-item-clickable:hover { background: #fee2e2; }
 .cd-section { padding: 16px 22px; border-bottom: 1px solid var(--border-light); }
 .cd-section:last-child { border-bottom: none; }
 .cd-section-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: 10px; }
@@ -636,6 +639,7 @@ section.view > * { width: 100%; max-width: 1400px; box-sizing: border-box; }
 .cal-status-na { background: var(--red); }
 .cal-status-co { background: #0891b2; }
 .cal-status-re    { background: var(--amber); }
+.cal-status-cancelado { background: #dc2626; }
 .cal-status-block { background: #94a3b8; }
 .cal-event-presencial   { border-left: 3px solid #7c3aed; padding-left: 8px; }
 .cal-event-teleconsulta { border-left: 3px solid #f97316; padding-left: 8px; }

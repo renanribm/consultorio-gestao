@@ -891,7 +891,7 @@ function renderAgenda() {
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const dayMap   = {};
   S.data.consultations.forEach(c => {
-    if (c.date && c.date.startsWith(monthStr) && c.status !== 'cancelado') {
+    if (c.date && c.date.startsWith(monthStr)) {
       const day = c.date.split('-')[2];
       if (!dayMap[day]) dayMap[day] = [];
       dayMap[day].push(c);
@@ -902,7 +902,7 @@ function renderAgenda() {
   const lastDate    = new Date(year, month + 1, 0).getDate();
   const prevLast    = new Date(year, month, 0).getDate();
   const todayStr    = today();
-  const statusOrder = ['cp','at','co','sc','re','na'];
+  const statusOrder = ['cp','at','co','sc','re','na','cancelado'];
   const holidays    = getHolidays(year);
 
   let cells = '';
@@ -987,7 +987,7 @@ function renderCalendarDetail(dateStr) {
        </div>`
     : '';
 
-  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online' };
+  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online', cancelado:'Cancelado' };
 
   if (events.length === 0) {
     detailList.innerHTML = holBanner + '<div class="empty-state">Nenhuma consulta registrada neste dia.</div>';
@@ -1015,10 +1015,12 @@ function renderCalendarDetail(dateStr) {
       }
     }
 
-    const isBlock   = !e.iclinicPatientId && !e.patientId;
-    const dotCls    = isBlock ? 'cal-status-block' : `cal-status-${e.status || 'sc'}`;
-    const statusTxt = isBlock ? 'Bloqueio' : (statusLabels[e.status] || e.status || '—');
-    const nameEl    = isBlock
+    const isBlock      = !e.iclinicPatientId && !e.patientId;
+    const isCancelled  = !isBlock && e.status === 'cancelado';
+    const dotCls       = isBlock ? 'cal-status-block' : `cal-status-${e.status || 'sc'}`;
+    const statusTxt    = isBlock ? 'Bloqueio' : (statusLabels[e.status] || e.status || '—');
+    const nameStyle    = isCancelled ? 'font-weight:600;color:#991b1b;text-decoration:line-through' : 'font-weight:600;color:var(--text)';
+    const nameEl       = isBlock
       ? `<span style="color:var(--text-muted);font-style:italic">${esc(e.notes || 'Bloqueio pessoal')}</span>`
       : e.patientId
         ? `<span class="patient-link" data-patient="${e.patientId}">${esc(e.patientName || '—')}</span>`
@@ -1032,12 +1034,13 @@ function renderCalendarDetail(dateStr) {
       : '';
 
     const modalCls = isBlock ? '' : e.consultationType === 'teleconsulta' ? ' cal-event-teleconsulta' : ' cal-event-presencial';
+    const cancelCls = isCancelled ? ' cal-detail-item-cancelado' : '';
     const clickable = !isBlock && e.id;
-    items.push(`<div class="cal-detail-item${clickable ? ' cal-detail-item-clickable' : ''}${modalCls}" ${clickable ? `data-action="open-consult-detail" data-id="${e.id}"` : ''}>
+    items.push(`<div class="cal-detail-item${clickable ? ' cal-detail-item-clickable' : ''}${modalCls}${cancelCls}" ${clickable ? `data-action="open-consult-detail" data-id="${e.id}"` : ''}>
       ${timeRange}
       <div class="cal-detail-dot ${dotCls}" style="flex-shrink:0"></div>
       <div style="flex:1;min-width:0">
-        <div style="font-weight:600;color:var(--text)">${nameEl}</div>
+        <div style="${nameStyle}">${nameEl}</div>
         ${subLine}${notesLine}
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -1406,7 +1409,7 @@ function openConsultDetail(eventId) {
   if (!ev) return;
 
   const [y, m, d] = ev.date.split('-');
-  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online' };
+  const statusLabels = { cp:'Compareceu', at:'Atendido', sc:'Agendado', na:'Não compareceu', co:'Confirmado online', re:'Remarcado', eo:'Encaixe online', po:'Pendente online', cancelado:'Cancelado' };
   const fmtTime = t => t || '—';
 
   setText('cd-patient-name', ev.patientName || '—');
