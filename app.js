@@ -891,7 +891,7 @@ function renderAgenda() {
   const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
   const dayMap   = {};
   S.data.consultations.forEach(c => {
-    if (c.date && c.date.startsWith(monthStr)) {
+    if (c.date && c.date.startsWith(monthStr) && c.status !== 'cancelado') {
       const day = c.date.split('-')[2];
       if (!dayMap[day]) dayMap[day] = [];
       dayMap[day].push(c);
@@ -2585,7 +2585,7 @@ async function runImport() {
   el('import-progress').classList.remove('hidden');
   setProgress(0, 'Iniciando…');
 
-  const results = { patientsAdded:0, patientsUpdated:0, patientsNoChange:0, patientsProtected:0, eventsAdded:0, eventsUpdated:0, eventsNoChange:0, eventsIgnored:0, recAdded:0, recSkipped:0, recRescheduled:0, unmatched:[], errors:0 };
+  const results = { patientsAdded:0, patientsUpdated:0, patientsNoChange:0, patientsProtected:0, eventsAdded:0, eventsUpdated:0, eventsNoChange:0, eventsIgnored:0, eventsCancelled:0, recAdded:0, recSkipped:0, recRescheduled:0, recCancelled:0, unmatched:[], errors:0 };
 
   try {
     // ── 1. Pre-parse files + build iClinic name map ───────────────────────────
@@ -2738,6 +2738,34 @@ async function runImport() {
 
     await reloadCollection('consultations');
 
+    // ── 4b. Detect cancelled events (absent from CSV but future in Firestore) ─
+    if (evtFile && eventRows.length) {
+      const csvEventIds = new Set(eventRows.map(r => r.pk).filter(Boolean));
+      const activeScheduledStatuses = new Set(['sc', 'co', 're', 'eo', 'po']);
+      const todayForCancel = today();
+      const recByEventId = {};
+      S.data.recebimentos.forEach(r => { if (r.iclinicEventId) recByEventId[r.iclinicEventId] = r; });
+
+      for (const c of S.data.consultations) {
+        if (!c.iclinicEventId) continue;
+        if (!activeScheduledStatuses.has(c.status)) continue;
+        if (!c.date || c.date < todayForCancel) continue;
+        if (csvEventIds.has(c.iclinicEventId)) continue;
+
+        await updateDoc(doc(db, 'consultations', c.id), { status: 'cancelado', updatedAt: serverTimestamp() });
+        results.eventsCancelled++;
+
+        const rec = recByEventId[c.iclinicEventId];
+        if (rec && rec.status === 'pendente' && rec.createdBy === 'iclinic-import') {
+          await deleteDoc(doc(db, 'recebimentos', rec.id));
+          results.recCancelled++;
+        }
+      }
+
+      await reloadCollection('consultations');
+      await reloadCollection('recebimentos');
+    }
+
     // ── 5. Create pending recebimentos for future events ──────────────────────
     if (evtFile && eventRows.length) {
       const todayStr = today();
@@ -2834,8 +2862,8 @@ async function runImport() {
     res.innerHTML = `
       <strong>✓ Importação concluída!</strong><br><br>
       👤 Pacientes: <strong>${results.patientsAdded} adicionados</strong>${results.patientsUpdated ? ` · ${results.patientsUpdated} atualizados` : ''} · ${results.patientsNoChange} sem novidades${results.patientsProtected ? ` · ${results.patientsProtected} com dados protegidos` : ''}<br>
-      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>${results.eventsUpdated ? ` · ${results.eventsUpdated} atualizados` : ''} · ${results.eventsNoChange} sem novidades${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}<br>
-      ${results.recAdded || results.recRescheduled ? `💳 Consultas: <strong>${results.recAdded} criadas</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}<br>` : ''}
+      📅 Agendamentos (calendário): <strong>${results.eventsAdded} adicionados</strong>${results.eventsUpdated ? ` · ${results.eventsUpdated} atualizados` : ''} · ${results.eventsNoChange} sem novidades${results.eventsIgnored ? ` · ${results.eventsIgnored} ignorados (anteriores a set/2025)` : ''}${results.eventsCancelled ? ` · <strong>${results.eventsCancelled} cancelado${results.eventsCancelled > 1 ? 's' : ''}</strong>` : ''}<br>
+      ${results.recAdded || results.recRescheduled || results.recCancelled ? `💳 Consultas: <strong>${results.recAdded} criadas</strong>${results.recRescheduled ? ` · <strong>${results.recRescheduled} remarcada${results.recRescheduled > 1 ? 's' : ''}</strong>` : ''}${results.recCancelled ? ` · <strong>${results.recCancelled} cancelada${results.recCancelled > 1 ? 's' : ''}</strong>` : ''}<br>` : ''}
       ${results.unmatched.length ? `<br>⚠ ${results.unmatched.length} consulta${results.unmatched.length > 1 ? 's futuras' : ' futura'} sem paciente vinculado — revisão manual:<br><span style="font-size:.78rem;color:var(--text-muted)">${results.unmatched.map(e => `&nbsp;&nbsp;· ${fmtDate(e.date)} — ${esc(e.name)}: ${esc(e.desc)}`).join('<br>')}</span><br>` : ''}
       ${results.errors ? `<br>⚠ ${results.errors} linha${results.errors > 1 ? 's' : ''} ignorada${results.errors > 1 ? 's' : ''}.` : ''}
       <br><br>Dados disponíveis em <strong>Pacientes</strong>, <strong>Agenda</strong> e <strong>Consultas</strong>.
